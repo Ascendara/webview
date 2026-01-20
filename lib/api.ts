@@ -17,14 +17,17 @@ export interface ConnectionResponse {
 
 export interface Download {
   id: string;
-  title: string;
+  name: string;
   progress: number;
-  speed: number;
-  eta: number;
+  speed: string;
+  eta: string;
   status: 'queued' | 'downloading' | 'paused' | 'completed' | 'error';
-  totalSize: number;
-  downloadedSize: number;
-  error?: string;
+  size: string;
+  downloaded: string;
+  error: string | null;
+  paused: boolean;
+  stopped: boolean;
+  timestamp: string;
 }
 
 export interface DownloadsResponse {

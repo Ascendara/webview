@@ -21,6 +21,14 @@ export default function Home() {
   const [error, setError] = React.useState(false)
   const [showThemeSelector, setShowThemeSelector] = React.useState(false)
 
+  React.useEffect(() => {
+    const existingSession = apiClient.getSessionId()
+    if (existingSession) {
+      console.log('[Connection] Existing session found, redirecting to dashboard')
+      router.push('/dashboard')
+    }
+  }, [router])
+
   const handleCodeComplete = async (code: string) => {
     console.log('[Connection] Code input completed:', code)
     console.log('[Connection] Code length:', code.length)

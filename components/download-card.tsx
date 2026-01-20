@@ -53,7 +53,7 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className={cn("text-lg font-semibold line-clamp-2", themeColors.text)}>
-            {download.title}
+            {download.name}
           </CardTitle>
           <div className={cn('flex items-center gap-1 text-sm font-medium whitespace-nowrap', getStatusColor(download.status))}>
             {getStatusIcon()}
@@ -69,7 +69,7 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
           </div>
           <Progress value={download.progress} className="h-2" />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{formatBytes(download.downloadedSize)} / {formatBytes(download.totalSize)}</span>
+            <span>{download.downloaded} / {download.size}</span>
           </div>
         </div>
 
@@ -77,11 +77,11 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-muted-foreground">Speed</div>
-              <div className="font-semibold">{formatSpeed(download.speed)}</div>
+              <div className="font-semibold">{download.speed}</div>
             </div>
             <div>
               <div className="text-muted-foreground">ETA</div>
-              <div className="font-semibold">{formatETA(download.eta)}</div>
+              <div className="font-semibold">{download.eta}</div>
             </div>
           </div>
         )}

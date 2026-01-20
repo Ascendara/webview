@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeSelectorModal } from '@/components/theme-selector-modal'
 import { ThemeButton } from '@/components/theme-button'
 import { InstallPrompt } from '@/components/install-prompt'
+import { BottomNavbar } from '@/components/bottom-navbar'
 import { apiClient, Download } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
@@ -229,7 +230,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className={cn("min-h-screen bg-gradient-to-br", themeColors.bg)}>
+      <div className={cn("min-h-screen bg-gradient-to-br pb-16", themeColors.bg)}>
         <div className={cn("sticky top-0 z-10 backdrop-blur-lg border-b", themeColors.card, themeColors.border)}>
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
@@ -411,6 +412,7 @@ export default function Dashboard() {
     </AlertDialog>
 
     <InstallPrompt />
+    <BottomNavbar />
   </>
   )
 }
