@@ -578,7 +578,7 @@ export default function Dashboard() {
   }
 
   const activeDownloads = downloads.filter(d => 
-    d.status === 'downloading' || d.status === 'queued'
+    d.status === 'downloading' || d.status === 'queued' || d.status === 'extracting'
   )
   const pausedDownloads = downloads.filter(d => d.status === 'paused' || d.status === 'stopped')
   const completedDownloads = downloads.filter(d => d.status === 'completed')

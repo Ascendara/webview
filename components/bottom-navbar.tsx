@@ -11,7 +11,7 @@ export function BottomNavbar() {
 
   return (
     <div className={cn(
-      "fixed bottom-4 left-4 right-4 z-40 border rounded-lg backdrop-blur-lg shadow-lg",
+      "fixed bottom-4 left-4 mb-4 right-4 z-40 border rounded-lg backdrop-blur-lg shadow-lg",
       themeColors.card,
       themeColors.border
     )}>

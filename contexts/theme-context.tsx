@@ -33,16 +33,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const newTheme = themes.find(t => t.id === themeId)
     if (newTheme) {
       setCurrentTheme(newTheme)
-      localStorage.setItem(THEME_STORAGE_KEY, themeId)
+      if (mounted) {
+        localStorage.setItem(THEME_STORAGE_KEY, themeId)
+      }
     }
-  }, [])
+  }, [mounted])
 
   const themeColors = React.useMemo(() => getThemeColors(currentTheme.id), [currentTheme.id])
   const isDark = currentTheme.group === 'dark'
-
-  if (!mounted) {
-    return <>{children}</>
-  }
 
   return (
     <ThemeContext.Provider value={{ theme: currentTheme, themeColors, setTheme, isDark }}>

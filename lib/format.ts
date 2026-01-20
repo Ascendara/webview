@@ -33,6 +33,8 @@ export function getStatusColor(status: string): string {
   switch (status) {
     case 'downloading':
       return 'text-blue-600 dark:text-blue-400';
+    case 'extracting':
+      return 'text-purple-600 dark:text-purple-400';
     case 'paused':
     case 'stopped':
       return 'text-yellow-600 dark:text-yellow-400';
