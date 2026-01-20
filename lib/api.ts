@@ -1,0 +1,293 @@
+import { config } from './config'
+
+const API_BASE_URL = config.apiBaseUrl;
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface ConnectionResponse {
+  sessionId: string;
+  displayName: string;
+  userId: string;
+  message?: string;
+}
+
+export interface Download {
+  id: string;
+  title: string;
+  progress: number;
+  speed: number;
+  eta: number;
+  status: 'queued' | 'downloading' | 'paused' | 'completed' | 'error';
+  totalSize: number;
+  downloadedSize: number;
+  error?: string;
+}
+
+export interface DownloadsResponse {
+  downloads: Download[];
+  lastUpdated: string;
+}
+
+class ApiClient {
+  private sessionId: string | null = null;
+
+  setSessionId(sessionId: string) {
+    console.log('[API] Setting session ID:', sessionId)
+    this.sessionId = sessionId;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ascendara_session_id', sessionId);
+      console.log('[API] Session ID saved to localStorage')
+    } else {
+      console.warn('[API] Window not available, cannot save to localStorage')
+    }
+  }
+
+  getSessionId(): string | null {
+    console.log('[API] Getting session ID from memory:', this.sessionId)
+    if (this.sessionId) return this.sessionId;
+    if (typeof window !== 'undefined') {
+      this.sessionId = localStorage.getItem('ascendara_session_id');
+      console.log('[API] Session ID retrieved from localStorage:', this.sessionId)
+    } else {
+      console.warn('[API] Window not available, cannot read from localStorage')
+    }
+    return this.sessionId;
+  }
+
+  clearSession() {
+    console.log('[API] Clearing session')
+    this.sessionId = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('ascendara_session_id');
+      localStorage.removeItem('ascendara_user_id');
+      console.log('[API] Session and user ID cleared from localStorage')
+    }
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    console.log(`[API] Making request to: ${API_BASE_URL}${endpoint}`)
+    console.log('[API] Request options:', options)
+    
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (options.headers) {
+        Object.entries(options.headers).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            headers[key] = value;
+          }
+        });
+      }
+
+      if (this.sessionId) {
+        console.log('[API] Adding session ID to headers:', this.sessionId)
+        headers['X-Session-ID'] = this.sessionId;
+      }
+
+      console.log('[API] Request headers:', headers)
+      console.log('[API] Request body:', options.body)
+
+      const fetchUrl = `${API_BASE_URL}${endpoint}`
+      console.log('[API] Full URL:', fetchUrl)
+
+      const response = await fetch(fetchUrl, {
+        ...options,
+        headers,
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      console.log('[API] Response received')
+      console.log('[API] Response status:', response.status)
+      console.log('[API] Response ok:', response.ok)
+      console.log('[API] Response headers:', Object.fromEntries(response.headers.entries()))
+
+      // Handle rate limiting and other non-JSON responses
+      if (response.status === 429) {
+        console.error('[API] Rate limit exceeded - too many requests')
+        return {
+          success: false,
+          error: 'Rate limit exceeded. Please wait before trying again.',
+        };
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('[API] Non-JSON response received:', contentType)
+        const text = await response.text();
+        console.error('[API] Response text (first 200 chars):', text.substring(0, 200))
+        return {
+          success: false,
+          error: `Server error (${response.status}): ${response.statusText}`,
+        };
+      }
+
+      const data = await response.json();
+      console.log('[API] Response data:', data)
+
+      if (!response.ok) {
+        console.error('[API] Request failed:', data.error || `Status ${response.status}`)
+        return {
+          success: false,
+          error: data.error || `Request failed with status ${response.status}`,
+        };
+      }
+
+      console.log('[API] Request successful')
+      return {
+        success: true,
+        data: data,
+      };
+    } catch (error) {
+      console.error('[API] Request exception:', error)
+      console.error('[API] Error type:', error instanceof Error ? error.constructor.name : typeof error)
+      console.error('[API] Error message:', error instanceof Error ? error.message : String(error))
+      console.error('[API] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      
+      let errorMessage = 'Network error';
+      if (error instanceof Error) {
+        if (error.message === 'Failed to fetch') {
+          errorMessage = 'Cannot connect to server. Please check:\n1. Backend is running at ' + API_BASE_URL + '\n2. CORS is configured\n3. Network connection is active';
+          console.error('[API] CORS or network connectivity issue detected')
+          console.error('[API] Backend URL:', API_BASE_URL)
+          console.error('[API] Make sure the backend allows requests from this origin')
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async verifyCode(code: string): Promise<ApiResponse<ConnectionResponse>> {
+    console.log('[API] verifyCode called with code:', code)
+    console.log('[API] Code length:', code.length)
+    console.log('[API] Code type:', typeof code)
+    
+    const result = await this.request<ConnectionResponse>('/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+    
+    console.log('[API] verifyCode result:', result)
+    
+    // Store user ID if connection successful
+    if (result.success && result.data) {
+      this.setUserId(result.data.userId);
+      console.log('[API] Stored user ID from connection:', result.data.userId);
+    }
+    
+    return result;
+  }
+
+  async getDownloads(): Promise<ApiResponse<DownloadsResponse>> {
+    // Get user ID from session data stored when connecting
+    const userId = this.getUserId();
+    if (!userId) {
+      console.error('[API] No user ID found in session');
+      return {
+        success: false,
+        error: 'No user session found. Please reconnect.',
+      };
+    }
+    
+    console.log('[API] Fetching downloads for user:', userId);
+    return this.request<DownloadsResponse>(`/downloads/${userId}`);
+  }
+  
+  getUserId(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ascendara_user_id');
+    }
+    return null;
+  }
+  
+  setUserId(userId: string) {
+    console.log('[API] Setting user ID:', userId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ascendara_user_id', userId);
+    }
+  }
+
+  async pauseDownload(downloadId: string): Promise<ApiResponse<{ message: string }>> {
+    console.log('[API] Pausing download:', downloadId);
+    return this.request<{ message: string }>('/downloads/command', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        command: 'pause',
+        downloadId 
+      }),
+    });
+  }
+
+  async resumeDownload(downloadId: string): Promise<ApiResponse<{ message: string }>> {
+    console.log('[API] Resuming download:', downloadId);
+    return this.request<{ message: string }>('/downloads/command', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        command: 'resume',
+        downloadId 
+      }),
+    });
+  }
+
+  async cancelDownload(downloadId: string): Promise<ApiResponse<{ message: string }>> {
+    console.log('[API] Cancelling download:', downloadId);
+    return this.request<{ message: string }>('/downloads/command', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        command: 'stop',
+        downloadId 
+      }),
+    });
+  }
+
+  async checkConnection(): Promise<ApiResponse<{ connected: boolean }>> {
+    return this.request<{ connected: boolean }>('/check-connection');
+  }
+
+  async disconnect(): Promise<ApiResponse<{ message: string }>> {
+    console.log('[API] Disconnecting device from user account');
+    const sessionId = this.getSessionId();
+    const userId = this.getUserId();
+    
+    if (!sessionId || !userId) {
+      console.warn('[API] No session or user ID found for disconnect');
+      return {
+        success: false,
+        error: 'No active session to disconnect',
+      };
+    }
+
+    const result = await this.request<{ message: string }>('/disconnect-device', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        sessionId,
+        userId 
+      }),
+    });
+
+    console.log('[API] Disconnect result:', result);
+    
+    // Clear local session data regardless of backend response
+    this.clearSession();
+    
+    return result;
+  }
+}
+
+export const apiClient = new ApiClient();
