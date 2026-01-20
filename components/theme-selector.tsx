@@ -13,7 +13,7 @@ interface ThemeSelectorProps {
 }
 
 export function ThemeSelector({ onClose }: ThemeSelectorProps) {
-  const { theme: currentTheme, setTheme } = useTheme()
+  const { theme: currentTheme, setTheme, themeColors } = useTheme()
 
   const lightThemes = themes.filter(t => t.group === 'light')
   const darkThemes = themes.filter(t => t.group === 'dark')
@@ -40,7 +40,7 @@ export function ThemeSelector({ onClose }: ThemeSelectorProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <h3 className={cn("text-xs font-semibold uppercase tracking-wide opacity-70", themeColors.text)}>
             Light Themes
           </h3>
           <div className="grid grid-cols-3 gap-2">
@@ -74,7 +74,7 @@ export function ThemeSelector({ onClose }: ThemeSelectorProps) {
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <h3 className={cn("text-xs font-semibold uppercase tracking-wide opacity-70", themeColors.text)}>
             Dark Themes
           </h3>
           <div className="grid grid-cols-3 gap-2">
@@ -108,7 +108,7 @@ export function ThemeSelector({ onClose }: ThemeSelectorProps) {
         </div>
 
         <div className="pt-2 border-t">
-          <p className="text-[10px] text-muted-foreground text-center">
+          <p className={cn("text-[10px] text-center opacity-70", themeColors.text)}>
             Your theme preference is saved automatically
           </p>
         </div>

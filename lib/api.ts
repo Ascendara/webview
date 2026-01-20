@@ -21,7 +21,7 @@ export interface Download {
   progress: number;
   speed: string;
   eta: string;
-  status: 'queued' | 'downloading' | 'paused' | 'completed' | 'error';
+  status: 'queued' | 'downloading' | 'paused' | 'stopped' | 'completed' | 'error';
   size: string;
   downloaded: string;
   error: string | null;
@@ -249,11 +249,11 @@ class ApiClient {
   }
 
   async cancelDownload(downloadId: string): Promise<ApiResponse<{ message: string }>> {
-    console.log('[API] Cancelling download:', downloadId);
+    console.log('[API] Killing download:', downloadId);
     return this.request<{ message: string }>('/downloads/command', {
       method: 'POST',
       body: JSON.stringify({ 
-        command: 'stop',
+        command: 'kill',
         downloadId 
       }),
     });
@@ -261,6 +261,16 @@ class ApiClient {
 
   async checkConnection(): Promise<ApiResponse<{ connected: boolean }>> {
     return this.request<{ connected: boolean }>('/check-connection');
+  }
+
+  async getUserName(): Promise<ApiResponse<{ displayName: string; userId: string }>> {
+    console.log('[API] Fetching username');
+    return this.request<{ displayName: string; userId: string }>('/getusername');
+  }
+
+  async checkNotifications(): Promise<ApiResponse<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>> {
+    console.log('[API] Checking for new download notifications');
+    return this.request<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>('/downloads/check-notifications');
   }
 
   async disconnect(): Promise<ApiResponse<{ message: string }>> {

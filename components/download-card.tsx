@@ -4,11 +4,20 @@ import * as React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Pause, Play, X, Download, AlertCircle, Clock } from 'lucide-react'
+import { Pause, Play, X, Download, AlertCircle, Clock, Trash2, Loader2 } from 'lucide-react'
 import { Download as DownloadType } from '@/lib/api'
 import { formatBytes, formatSpeed, formatETA, getStatusColor, getStatusText } from '@/lib/format'
 import { useTheme } from '@/contexts/theme-context'
 import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface DownloadCardProps {
   download: DownloadType
@@ -20,22 +29,24 @@ interface DownloadCardProps {
 
 export function DownloadCard({ download, onPause, onResume, onCancel, disabled = false }: DownloadCardProps) {
   const { themeColors } = useTheme()
-  const [isActionLoading, setIsActionLoading] = React.useState(false)
+  const [showKillDialog, setShowKillDialog] = React.useState(false)
 
-  const handleAction = async (action: () => void) => {
-    setIsActionLoading(true)
-    try {
-      await action()
-    } finally {
-      setIsActionLoading(false)
+  React.useEffect(() => {
+    if (download.status === 'paused' || download.status === 'stopped') {
+      console.log(`[DownloadCard] Rendering paused download ${download.id}:`, {
+        progress: download.progress,
+        downloaded: download.downloaded,
+        size: download.size
+      })
     }
-  }
+  }, [download])
 
   const getStatusIcon = () => {
     switch (download.status) {
       case 'downloading':
         return <Download className="h-4 w-4" />
       case 'paused':
+      case 'stopped':
         return <Pause className="h-4 w-4" />
       case 'completed':
         return <Download className="h-4 w-4" />
@@ -49,7 +60,7 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
   }
 
   return (
-    <Card className={cn("overflow-hidden transition-all border", themeColors.card, themeColors.cardHover)}>
+    <Card className={cn("overflow-hidden transition-all border", themeColors.card, themeColors.cardHover, disabled && "opacity-60")}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className={cn("text-lg font-semibold line-clamp-2", themeColors.text)}>
@@ -64,11 +75,11 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-semibold">{download.progress.toFixed(1)}%</span>
+            <span className={cn("opacity-70", themeColors.text)}>Progress</span>
+            <span className={cn("font-semibold", themeColors.text)}>{download.progress.toFixed(1)}%</span>
           </div>
           <Progress value={download.progress} className="h-2" />
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className={cn("flex items-center justify-between text-xs opacity-70", themeColors.text)}>
             <span>{download.downloaded} / {download.size}</span>
           </div>
         </div>
@@ -76,12 +87,12 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
         {download.status === 'downloading' && (
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <div className="text-muted-foreground">Speed</div>
-              <div className="font-semibold">{download.speed}</div>
+              <div className={cn("opacity-70", themeColors.text)}>Speed</div>
+              <div className={cn("font-semibold", themeColors.text)}>{download.speed}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">ETA</div>
-              <div className="font-semibold">{download.eta}</div>
+              <div className={cn("opacity-70", themeColors.text)}>ETA</div>
+              <div className={cn("font-semibold", themeColors.text)}>{download.eta}</div>
             </div>
           </div>
         )}
@@ -98,39 +109,87 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={() => handleAction(() => onPause(download.id))}
-              disabled={disabled || isActionLoading}
+              onClick={() => onPause(download.id)}
+              disabled={disabled}
             >
-              <Pause className="h-4 w-4 mr-2" />
+              {disabled ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Pause className="h-4 w-4 mr-2" />
+              )}
               Pause
             </Button>
           )}
-          {download.status === 'paused' && (
+          {(download.status === 'paused' || download.status === 'stopped') && (
             <Button
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={() => handleAction(() => onResume(download.id))}
-              disabled={disabled || isActionLoading}
+              onClick={() => onResume(download.id)}
+              disabled={disabled}
             >
-              <Play className="h-4 w-4 mr-2" />
+              {disabled ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
               Resume
             </Button>
           )}
-          {(download.status === 'downloading' || download.status === 'paused' || download.status === 'queued') && (
+          {(download.status === 'downloading' || download.status === 'paused' || download.status === 'stopped' || download.status === 'queued') && (
             <Button
               variant="destructive"
               size="sm"
               className="flex-1"
-              onClick={() => handleAction(() => onCancel(download.id))}
-              disabled={disabled || isActionLoading}
+              onClick={() => setShowKillDialog(true)}
+              disabled={disabled}
             >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
+              {disabled ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Kill
             </Button>
           )}
         </div>
       </CardContent>
+
+      <AlertDialog open={showKillDialog} onOpenChange={setShowKillDialog}>
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Kill Download?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to kill <strong>{download.name}</strong>?
+              <br />
+              <br />
+              This will permanently stop and delete the download. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowKillDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowKillDialog(false)
+                onCancel(download.id)
+              }}
+              className="w-full sm:w-auto"
+            >
+              Kill Download
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { X, Smartphone, Share, Plus, MoreVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/contexts/theme-context'
 
 const STORAGE_KEY = 'ascendara-install-prompt-dismissed'
 
 export function InstallPrompt() {
+  const { themeColors } = useTheme()
   const [isVisible, setIsVisible] = React.useState(false)
   const [isIOS, setIsIOS] = React.useState(false)
   const [isAndroid, setIsAndroid] = React.useState(false)
@@ -69,14 +71,14 @@ export function InstallPrompt() {
         </CardHeader>
         
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className={cn("text-sm opacity-70", themeColors.text)}>
             Install Ascendara Monitor for quick access and a better experience!
           </p>
 
           {isIOS && (
             <div className="space-y-3">
-              <p className="text-sm font-semibold">For iPhone/iPad:</p>
-              <ol className="space-y-2 text-sm">
+              <p className={cn("text-sm font-semibold", themeColors.text)}>For iPhone/iPad:</p>
+              <ol className={cn("space-y-2 text-sm", themeColors.text)}>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">1</span>
                   <span>Tap the <Share className="inline h-4 w-4 mx-1" /> Share button at the bottom of Safari</span>
@@ -95,8 +97,8 @@ export function InstallPrompt() {
 
           {isAndroid && (
             <div className="space-y-3">
-              <p className="text-sm font-semibold">For Android:</p>
-              <ol className="space-y-2 text-sm">
+              <p className={cn("text-sm font-semibold", themeColors.text)}>For Android:</p>
+              <ol className={cn("space-y-2 text-sm", themeColors.text)}>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">1</span>
                   <span>Tap the <MoreVertical className="inline h-4 w-4 mx-1" /> menu button (three dots)</span>

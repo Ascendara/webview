@@ -25,7 +25,7 @@ export function BottomNavbar() {
               <span className={cn("text-sm font-semibold leading-none", themeColors.text)}>
                 Ascendara
               </span>
-              <span className="text-xs text-muted-foreground leading-none mt-0.5">
+              <span className={cn("text-xs leading-none mt-0.5 opacity-70", themeColors.text)}>
                 Download Monitor
               </span>
             </div>

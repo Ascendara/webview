@@ -34,6 +34,7 @@ export function getStatusColor(status: string): string {
     case 'downloading':
       return 'text-blue-600 dark:text-blue-400';
     case 'paused':
+    case 'stopped':
       return 'text-yellow-600 dark:text-yellow-400';
     case 'completed':
       return 'text-green-600 dark:text-green-400';
@@ -47,5 +48,6 @@ export function getStatusColor(status: string): string {
 }
 
 export function getStatusText(status: string): string {
+  if (status === 'stopped') return 'Paused';
   return status.charAt(0).toUpperCase() + status.slice(1);
 }

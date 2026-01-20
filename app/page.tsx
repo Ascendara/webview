@@ -109,12 +109,12 @@ export default function Home() {
               error={error}
             />
             {isLoading && (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <div className={cn("flex items-center justify-center gap-2 text-sm opacity-70", themeColors.text)}>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Connecting...</span>
               </div>
             )}
-            <div className="text-center text-sm text-muted-foreground">
+            <div className={cn("text-center text-sm opacity-70", themeColors.text)}>
               <p>Open Ascendara on your desktop and navigate to</p>
               <p className="font-semibold mt-1">Ascend → Settings → Remote Access</p>
             </div>

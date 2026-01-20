@@ -35,7 +35,12 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
   const [showThemeSelector, setShowThemeSelector] = React.useState(false)
   const [showSessionExpiredDialog, setShowSessionExpiredDialog] = React.useState(false)
+  const [loadingDownloads, setLoadingDownloads] = React.useState<Set<string>>(new Set())
+  const [userName, setUserName] = React.useState<string>('')
+  const pausedDownloadCache = React.useRef<Map<string, { progress: number; downloaded: string }>>(new Map())
+  const previousDownloadsRef = React.useRef<Map<string, Download>>(new Map())
   const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null)
+  const notificationPollingRef = React.useRef<NodeJS.Timeout | null>(null)
 
   React.useEffect(() => {
     const sessionId = apiClient.getSessionId()
@@ -48,6 +53,36 @@ export default function Dashboard() {
     console.log('[Dashboard] Effect running, isMounted:', isMounted)
     console.log('[Dashboard] Setting up polling with interval:', config.pollingInterval, 'ms')
     console.log('[Dashboard] This equals', config.pollingInterval / 1000, 'seconds')
+    
+    const fetchUserName = async () => {
+      try {
+        const response = await apiClient.getUserName()
+        if (response.success && response.data) {
+          setUserName(response.data.displayName)
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error fetching username:', error)
+      }
+    }
+    
+    const checkForNewDownloads = async () => {
+      if (!isMounted) return
+      
+      try {
+        const response = await apiClient.checkNotifications()
+        if (response.success && response.data?.hasNewDownloads) {
+          console.log('[Dashboard] New download detected! Fetching downloads immediately...')
+          if (response.data.notifications.length > 0) {
+            const downloadNames = response.data.notifications.map(n => n.downloadName).join(', ')
+            console.log('[Dashboard] New downloads:', downloadNames)
+          }
+          // Immediately fetch downloads when notification received
+          await fetchDownloads(false)
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error checking notifications:', error)
+      }
+    }
     
     const fetchDownloads = async (showLoading = false) => {
       if (!isMounted) {
@@ -66,7 +101,63 @@ export default function Dashboard() {
         if (!isMounted) return
 
         if (response.success && response.data) {
-          setDownloads(response.data.downloads)
+          const downloadsWithCache = response.data.downloads.map(download => {
+            const previousDownload = previousDownloadsRef.current.get(download.id)
+            
+            // Check if download is paused/stopped
+            if ((download.status === 'paused' || download.status === 'stopped')) {
+              console.log(`[Dashboard] Processing paused download ${download.id}, current API values:`, { 
+                progress: download.progress, 
+                downloaded: download.downloaded,
+                hasCache: pausedDownloadCache.current.has(download.id)
+              })
+              
+              // If we have previous data with progress > 0, cache it before it gets lost
+              if (previousDownload && previousDownload.progress > 0 && 
+                  (previousDownload.status === 'downloading' || previousDownload.status === 'queued')) {
+                pausedDownloadCache.current.set(download.id, {
+                  progress: previousDownload.progress,
+                  downloaded: previousDownload.downloaded
+                })
+                console.log(`[Dashboard] Cached values on pause transition for ${download.id}:`, { progress: previousDownload.progress, downloaded: previousDownload.downloaded })
+              }
+              
+              // If download still has progress, cache it
+              if (download.progress > 0) {
+                pausedDownloadCache.current.set(download.id, {
+                  progress: download.progress,
+                  downloaded: download.downloaded
+                })
+                console.log(`[Dashboard] Cached current values for paused download ${download.id}:`, { progress: download.progress, downloaded: download.downloaded })
+              }
+              
+              // Always use cached values if available for paused downloads
+              const cached = pausedDownloadCache.current.get(download.id)
+              if (cached) {
+                console.log(`[Dashboard] ✓ Applying cached values for paused download ${download.id}:`, cached)
+                return { ...download, progress: cached.progress, downloaded: cached.downloaded }
+              } else {
+                console.warn(`[Dashboard] ⚠ No cache found for paused download ${download.id}!`)
+              }
+            }
+            
+            // Clear cache when download resumes
+            if (download.status === 'downloading' || download.status === 'queued') {
+              if (pausedDownloadCache.current.has(download.id)) {
+                console.log(`[Dashboard] Clearing cache for resumed download ${download.id}`)
+                pausedDownloadCache.current.delete(download.id)
+              }
+            }
+            
+            return download
+          })
+          
+          // Update previous downloads reference with the CACHED versions
+          downloadsWithCache.forEach(download => {
+            previousDownloadsRef.current.set(download.id, download)
+          })
+          
+          setDownloads(downloadsWithCache)
           setLastUpdated(new Date())
         } else {
           if (response.error?.includes('Unauthorized') || response.error?.includes('session')) {
@@ -101,6 +192,7 @@ export default function Dashboard() {
       }
     }
     
+    fetchUserName()
     fetchDownloads()
 
     if (pollingIntervalRef.current) {
@@ -114,6 +206,19 @@ export default function Dashboard() {
     }, config.pollingInterval)
     
     console.log('[Dashboard] Polling interval created with ID:', pollingIntervalRef.current)
+    
+    // Set up notification polling (more frequent than download polling)
+    if (notificationPollingRef.current) {
+      console.log('[Dashboard] Clearing existing notification interval')
+      clearInterval(notificationPollingRef.current)
+    }
+    
+    notificationPollingRef.current = setInterval(() => {
+      console.log('[Dashboard] Notification polling triggered')
+      checkForNewDownloads()
+    }, 2000) // Check every 2 seconds for new downloads
+    
+    console.log('[Dashboard] Notification polling created with ID:', notificationPollingRef.current)
 
     return () => {
       console.log('[Dashboard] Cleanup function called')
@@ -123,6 +228,11 @@ export default function Dashboard() {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
+      if (notificationPollingRef.current) {
+        console.log('[Dashboard] Clearing notification interval:', notificationPollingRef.current)
+        clearInterval(notificationPollingRef.current)
+        notificationPollingRef.current = null
+      }
     }
   }, [])
 
@@ -131,7 +241,45 @@ export default function Dashboard() {
     try {
       const response = await apiClient.getDownloads()
       if (response.success && response.data) {
-        setDownloads(response.data.downloads)
+        const downloadsWithCache = response.data.downloads.map(download => {
+          const previousDownload = previousDownloadsRef.current.get(download.id)
+          
+          if ((download.status === 'paused' || download.status === 'stopped')) {
+            if (previousDownload && previousDownload.progress > 0 && 
+                (previousDownload.status === 'downloading' || previousDownload.status === 'queued')) {
+              pausedDownloadCache.current.set(download.id, {
+                progress: previousDownload.progress,
+                downloaded: previousDownload.downloaded
+              })
+            }
+            
+            if (download.progress > 0) {
+              pausedDownloadCache.current.set(download.id, {
+                progress: download.progress,
+                downloaded: download.downloaded
+              })
+            }
+            
+            const cached = pausedDownloadCache.current.get(download.id)
+            if (cached) {
+              return { ...download, progress: cached.progress, downloaded: cached.downloaded }
+            }
+          }
+          
+          if (download.status === 'downloading' || download.status === 'queued') {
+            if (pausedDownloadCache.current.has(download.id)) {
+              pausedDownloadCache.current.delete(download.id)
+            }
+          }
+          
+          return download
+        })
+        
+        downloadsWithCache.forEach(download => {
+          previousDownloadsRef.current.set(download.id, download)
+        })
+        
+        setDownloads(downloadsWithCache)
         setLastUpdated(new Date())
       }
     } catch (error) {
@@ -142,52 +290,260 @@ export default function Dashboard() {
   }, [])
 
   const handlePause = async (id: string) => {
-    const response = await apiClient.pauseDownload(id)
-    if (response.success) {
-      toast({
-        title: 'Download Paused',
-        description: 'Download has been paused',
-      })
-      refreshDownloads()
-    } else {
+    setLoadingDownloads(prev => new Set(prev).add(id))
+    try {
+      console.log('[Dashboard] Pausing download:', id)
+      
+      // Cache the current progress BEFORE pausing
+      const download = downloads.find(d => d.id === id)
+      if (download && download.progress > 0) {
+        pausedDownloadCache.current.set(id, {
+          progress: download.progress,
+          downloaded: download.downloaded
+        })
+        console.log(`[Dashboard] Pre-cached progress before pause for ${id}:`, { progress: download.progress, downloaded: download.downloaded })
+      }
+      
+      const response = await apiClient.pauseDownload(id)
+      console.log('[Dashboard] Pause command queued:', response)
+      
+      if (response.success) {
+        // Command queued successfully, now wait for status change
+        console.log('[Dashboard] Waiting for download to pause...')
+        
+        // Poll for status change (max 30 seconds)
+        const maxAttempts = 60 // 60 attempts * 500ms = 30 seconds
+        let attempts = 0
+        
+        const checkStatus = async (): Promise<boolean> => {
+          if (attempts >= maxAttempts) {
+            console.log('[Dashboard] Timeout waiting for pause confirmation')
+            return false
+          }
+          
+          attempts++
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          const downloadsResponse = await apiClient.getDownloads()
+          if (downloadsResponse.success && downloadsResponse.data) {
+            const download = downloadsResponse.data.downloads.find(d => d.id === id)
+            if (download && (download.status === 'paused' || download.status === 'stopped')) {
+              console.log('[Dashboard] Download paused successfully')
+              
+              // Apply cached values immediately
+              const downloadsWithCache = downloadsResponse.data.downloads.map(d => {
+                if (d.id === id) {
+                  const cached = pausedDownloadCache.current.get(id)
+                  if (cached) {
+                    console.log(`[Dashboard] Applying cached values immediately for ${id}:`, cached)
+                    return { ...d, progress: cached.progress, downloaded: cached.downloaded }
+                  }
+                }
+                return d
+              })
+              
+              downloadsWithCache.forEach(download => {
+                previousDownloadsRef.current.set(download.id, download)
+              })
+              
+              setDownloads(downloadsWithCache)
+              setLastUpdated(new Date())
+              return true
+            }
+          }
+          
+          return checkStatus()
+        }
+        
+        const success = await checkStatus()
+        
+        if (success) {
+          toast({
+            title: 'Download Paused',
+            description: 'Download has been paused',
+          })
+        } else {
+          toast({
+            title: 'Pause Timeout',
+            description: 'Command sent but status not confirmed',
+            variant: 'destructive',
+          })
+        }
+      } else {
+        toast({
+          title: 'Failed to pause',
+          description: response.error,
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error pausing download:', error)
       toast({
         title: 'Failed to pause',
-        description: response.error,
+        description: 'An error occurred',
         variant: 'destructive',
+      })
+    } finally {
+      setLoadingDownloads(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
       })
     }
   }
 
   const handleResume = async (id: string) => {
-    const response = await apiClient.resumeDownload(id)
-    if (response.success) {
-      toast({
-        title: 'Download Resumed',
-        description: 'Download has been resumed',
-      })
-      refreshDownloads()
-    } else {
+    setLoadingDownloads(prev => new Set(prev).add(id))
+    try {
+      console.log('[Dashboard] Resuming download:', id)
+      const response = await apiClient.resumeDownload(id)
+      console.log('[Dashboard] Resume command queued:', response)
+      
+      if (response.success) {
+        // Command queued successfully, now wait for status change
+        console.log('[Dashboard] Waiting for download to resume...')
+        
+        // Poll for status change (max 30 seconds)
+        const maxAttempts = 60
+        let attempts = 0
+        
+        const checkStatus = async (): Promise<boolean> => {
+          if (attempts >= maxAttempts) {
+            console.log('[Dashboard] Timeout waiting for resume confirmation')
+            return false
+          }
+          
+          attempts++
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          const downloadsResponse = await apiClient.getDownloads()
+          if (downloadsResponse.success && downloadsResponse.data) {
+            const download = downloadsResponse.data.downloads.find(d => d.id === id)
+            if (download && (download.status === 'downloading' || download.status === 'queued')) {
+              console.log('[Dashboard] Download resumed successfully')
+              setDownloads(downloadsResponse.data.downloads)
+              setLastUpdated(new Date())
+              return true
+            }
+          }
+          
+          return checkStatus()
+        }
+        
+        const success = await checkStatus()
+        
+        if (success) {
+          if (pausedDownloadCache.current.has(id)) {
+            console.log(`[Dashboard] Clearing cached progress for resumed download ${id}`)
+            pausedDownloadCache.current.delete(id)
+          }
+          
+          toast({
+            title: 'Download Resumed',
+            description: 'Download has been resumed',
+          })
+        } else {
+          toast({
+            title: 'Resume Timeout',
+            description: 'Command sent but status not confirmed',
+            variant: 'destructive',
+          })
+        }
+      } else {
+        toast({
+          title: 'Failed to resume',
+          description: response.error,
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error resuming download:', error)
       toast({
         title: 'Failed to resume',
-        description: response.error,
+        description: 'An error occurred',
         variant: 'destructive',
+      })
+    } finally {
+      setLoadingDownloads(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
       })
     }
   }
 
   const handleCancel = async (id: string) => {
-    const response = await apiClient.cancelDownload(id)
-    if (response.success) {
+    setLoadingDownloads(prev => new Set(prev).add(id))
+    try {
+      console.log('[Dashboard] Killing download:', id)
+      const response = await apiClient.cancelDownload(id)
+      console.log('[Dashboard] Kill command queued:', response)
+      
+      if (response.success) {
+        // Command queued successfully, now wait for download to disappear or change status
+        console.log('[Dashboard] Waiting for download to be killed...')
+        
+        // Poll for status change (max 30 seconds)
+        const maxAttempts = 60
+        let attempts = 0
+        
+        const checkStatus = async (): Promise<boolean> => {
+          if (attempts >= maxAttempts) {
+            console.log('[Dashboard] Timeout waiting for kill confirmation')
+            return false
+          }
+          
+          attempts++
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          const downloadsResponse = await apiClient.getDownloads()
+          if (downloadsResponse.success && downloadsResponse.data) {
+            const download = downloadsResponse.data.downloads.find(d => d.id === id)
+            // Download should be removed or marked as error/completed
+            if (!download || download.status === 'error' || download.status === 'completed') {
+              console.log('[Dashboard] Download killed successfully')
+              setDownloads(downloadsResponse.data.downloads)
+              setLastUpdated(new Date())
+              return true
+            }
+          }
+          
+          return checkStatus()
+        }
+        
+        const success = await checkStatus()
+        
+        if (success) {
+          toast({
+            title: 'Download Killed',
+            description: 'Download has been killed',
+          })
+        } else {
+          toast({
+            title: 'Kill Timeout',
+            description: 'Command sent but status not confirmed',
+            variant: 'destructive',
+          })
+        }
+      } else {
+        toast({
+          title: 'Failed to kill',
+          description: response.error,
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error killing download:', error)
       toast({
-        title: 'Download Cancelled',
-        description: 'Download has been cancelled',
-      })
-      refreshDownloads()
-    } else {
-      toast({
-        title: 'Failed to cancel',
-        description: response.error,
+        title: 'Failed to kill',
+        description: 'An error occurred',
         variant: 'destructive',
+      })
+    } finally {
+      setLoadingDownloads(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
       })
     }
   }
@@ -224,7 +580,7 @@ export default function Dashboard() {
   const activeDownloads = downloads.filter(d => 
     d.status === 'downloading' || d.status === 'queued'
   )
-  const pausedDownloads = downloads.filter(d => d.status === 'paused')
+  const pausedDownloads = downloads.filter(d => d.status === 'paused' || d.status === 'stopped')
   const completedDownloads = downloads.filter(d => d.status === 'completed')
   const errorDownloads = downloads.filter(d => d.status === 'error')
 
@@ -236,9 +592,11 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div>
-                  <h1 className={cn("text-xl font-bold", themeColors.text)}>Downloads</h1>
+                  <h1 className={cn("text-xl font-bold", themeColors.text)}>
+                    {userName ? `Hey, ${userName}!` : 'Downloads'}
+                  </h1>
                   {lastUpdated && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={cn("text-xs opacity-70", themeColors.text)}>
                       Updated {lastUpdated.toLocaleTimeString()}
                     </p>
                   )}
@@ -256,6 +614,7 @@ export default function Dashboard() {
                 </Button>
                 <Button
                   variant="ghost"
+                  className={cn(themeColors.text)}
                   size="sm"
                   onClick={handleDisconnect}
                 >
@@ -276,11 +635,11 @@ export default function Dashboard() {
           </div>
         ) : downloads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Inbox className="h-10 w-10 text-muted-foreground" />
+            <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-4", themeColors.secondary)}>
+              <Inbox className={cn("h-10 w-10 opacity-50", themeColors.text)} />
             </div>
-            <h2 className="text-2xl font-semibold mb-2">No Active Downloads</h2>
-            <p className="text-muted-foreground max-w-md">
+            <h2 className={cn("text-2xl font-semibold mb-2", themeColors.text)}>No Active Downloads</h2>
+            <p className={cn("max-w-md opacity-70", themeColors.text)}>
               Start a download in Ascendara to monitor it here
             </p>
           </div>
@@ -300,6 +659,7 @@ export default function Dashboard() {
                       onPause={handlePause}
                       onResume={handleResume}
                       onCancel={handleCancel}
+                      disabled={loadingDownloads.has(download.id)}
                     />
                   ))}
                 </div>
@@ -319,6 +679,7 @@ export default function Dashboard() {
                       onPause={handlePause}
                       onResume={handleResume}
                       onCancel={handleCancel}
+                      disabled={loadingDownloads.has(download.id)}
                     />
                   ))}
                 </div>
@@ -327,7 +688,7 @@ export default function Dashboard() {
 
             {errorDownloads.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-red-600 dark:text-red-400">
+                <h2 className={cn("text-lg font-semibold", themeColors.text)}>
                   Failed Downloads ({errorDownloads.length})
                 </h2>
                 <div className="space-y-4">
@@ -338,6 +699,7 @@ export default function Dashboard() {
                       onPause={handlePause}
                       onResume={handleResume}
                       onCancel={handleCancel}
+                      disabled={loadingDownloads.has(download.id)}
                     />
                   ))}
                 </div>
@@ -346,7 +708,7 @@ export default function Dashboard() {
 
             {completedDownloads.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-green-600 dark:text-green-400">
+                <h2 className={cn("text-lg font-semibold", themeColors.text)}>
                   Completed ({completedDownloads.length})
                 </h2>
                 <div className="space-y-4">
@@ -357,6 +719,7 @@ export default function Dashboard() {
                       onPause={handlePause}
                       onResume={handleResume}
                       onCancel={handleCancel}
+                      disabled={loadingDownloads.has(download.id)}
                     />
                   ))}
                 </div>
