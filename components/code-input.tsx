@@ -21,6 +21,7 @@ export function CodeInput({ length = 6, onComplete, disabled = false, error = fa
     return Array(length).fill('')
   })
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([])
+  const hasProcessedInitialValue = React.useRef(false)
   const { themeColors } = useTheme()
   React.useEffect(() => {
     console.log('[CodeInput] Component mounted, focusing first input')
@@ -30,8 +31,9 @@ export function CodeInput({ length = 6, onComplete, disabled = false, error = fa
   }, [])
 
   React.useEffect(() => {
-    if (initialValue && /^\d{6}$/.test(initialValue)) {
+    if (initialValue && /^\d{6}$/.test(initialValue) && !hasProcessedInitialValue.current) {
       console.log('[CodeInput] Initial value provided:', initialValue)
+      hasProcessedInitialValue.current = true
       const newValues = initialValue.split('')
       setValues(newValues)
       onComplete(initialValue)
