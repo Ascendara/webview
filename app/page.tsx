@@ -10,7 +10,7 @@ import { ThemeButton } from '@/components/theme-button'
 import { apiClient } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
-import { Loader2, Smartphone } from 'lucide-react'
+import { Loader, Loader2, Smartphone, Unplug } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function Home() {
@@ -21,6 +21,7 @@ export default function Home() {
   const [error, setError] = React.useState(false)
   const [showThemeSelector, setShowThemeSelector] = React.useState(false)
   const [initialCode, setInitialCode] = React.useState<string>('')
+  const [autoConnecting, setAutoConnecting] = React.useState(false)
 
   React.useEffect(() => {
     const existingSession = apiClient.getSessionId()
@@ -36,6 +37,8 @@ export default function Home() {
     if (codeParam && /^\d{6}$/.test(codeParam)) {
       console.log('[Connection] 6-digit code found in URL:', codeParam)
       setInitialCode(codeParam)
+      setAutoConnecting(true)
+      handleCodeComplete(codeParam)
     }
   }, [router])
 
@@ -70,6 +73,7 @@ export default function Home() {
       } else {
         console.error('[Connection] Verification failed:', response.error)
         setError(true)
+        setAutoConnecting(false)
         toast({
           title: 'Connection Failed',
           description: response.error || 'Invalid or expired code',
@@ -81,6 +85,7 @@ export default function Home() {
       console.error('[Connection] Exception caught:', err)
       console.error('[Connection] Error details:', err instanceof Error ? err.message : 'Unknown error')
       setError(true)
+      setAutoConnecting(false)
       toast({
         title: 'Connection Error',
         description: 'Unable to connect to Ascendara',
@@ -88,6 +93,36 @@ export default function Home() {
       })
       setIsLoading(false)
     }
+  }
+
+  if (autoConnecting) {
+    return (
+      <div className={cn("flex min-h-screen items-center justify-center bg-gradient-to-br p-4", themeColors.bg)}>
+        <Card className={cn("w-full max-w-md shadow-lg border", themeColors.card)}>
+          <CardContent className="py-16">
+            <div className="flex flex-col items-center justify-center space-y-6">
+              <div className="relative">
+                <div className={cn("w-24 h-24 rounded-full flex items-center justify-center", themeColors.secondary)}>
+                  <Unplug className={cn("h-12 w-12", themeColors.accent)} />
+                </div>
+                <div className={cn("absolute inset-0 rounded-full animate-ping opacity-20", themeColors.secondary)} />
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h2 className={cn("text-2xl font-bold", themeColors.text)}>
+                  Connecting to Ascend
+                </h2>
+                <p className={cn("text-sm opacity-70", themeColors.text)}>
+                  Please wait while we start the session...
+                </p>
+              </div>
+              
+              <Loader className={cn("h-8 w-8 animate-spin", themeColors.accent)} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -104,7 +139,7 @@ export default function Home() {
             </div>
             <div>
               <CardTitle className={cn("text-2xl font-bold", themeColors.text)}>
-                Connect to Ascendara
+                Connect to Ascend
               </CardTitle>
               <CardDescription className="mt-2">
                 Enter the 6-digit code displayed in Ascendara
@@ -112,13 +147,20 @@ export default function Home() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <CodeInput
-              length={6}
-              onComplete={handleCodeComplete}
-              disabled={isLoading}
-              error={error}
-              initialValue={initialCode}
-            />
+            <div className="space-y-3">
+              <CodeInput
+                length={6}
+                onComplete={handleCodeComplete}
+                disabled={isLoading}
+                error={error}
+                initialValue={initialCode}
+              />
+              {error && (
+                <div className="flex items-center justify-center gap-2 text-sm text-red-500">
+                  <span>Invalid or expired code. Please try again.</span>
+                </div>
+              )}
+            </div>
             {isLoading && (
               <div className={cn("flex items-center justify-center gap-2 text-sm opacity-70", themeColors.text)}>
                 <Loader2 className="h-4 w-4 animate-spin" />
