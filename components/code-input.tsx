@@ -3,22 +3,40 @@
 import * as React from 'react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/contexts/theme-context'
 
 interface CodeInputProps {
   length?: number
   onComplete: (code: string) => void
   disabled?: boolean
   error?: boolean
+  initialValue?: string
 }
 
-export function CodeInput({ length = 6, onComplete, disabled = false, error = false }: CodeInputProps) {
-  const [values, setValues] = React.useState<string[]>(Array(length).fill(''))
+export function CodeInput({ length = 6, onComplete, disabled = false, error = false, initialValue = '' }: CodeInputProps) {
+  const [values, setValues] = React.useState<string[]>(() => {
+    if (initialValue && /^\d{6}$/.test(initialValue)) {
+      return initialValue.split('')
+    }
+    return Array(length).fill('')
+  })
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([])
-
+  const { themeColors } = useTheme()
   React.useEffect(() => {
     console.log('[CodeInput] Component mounted, focusing first input')
-    inputRefs.current[0]?.focus()
+    if (!initialValue) {
+      inputRefs.current[0]?.focus()
+    }
   }, [])
+
+  React.useEffect(() => {
+    if (initialValue && /^\d{6}$/.test(initialValue)) {
+      console.log('[CodeInput] Initial value provided:', initialValue)
+      const newValues = initialValue.split('')
+      setValues(newValues)
+      onComplete(initialValue)
+    }
+  }, [initialValue, onComplete])
 
   React.useEffect(() => {
     console.log('[CodeInput] Current values:', values)
@@ -134,6 +152,7 @@ export function CodeInput({ length = 6, onComplete, disabled = false, error = fa
           disabled={disabled}
           className={cn(
             'w-12 h-14 text-center text-2xl font-semibold',
+            themeColors.text,
             error && 'border-red-500 focus-visible:ring-red-500'
           )}
           aria-label={`Digit ${index + 1}`}

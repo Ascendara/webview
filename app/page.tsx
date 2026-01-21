@@ -20,12 +20,22 @@ export default function Home() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState(false)
   const [showThemeSelector, setShowThemeSelector] = React.useState(false)
+  const [initialCode, setInitialCode] = React.useState<string>('')
 
   React.useEffect(() => {
     const existingSession = apiClient.getSessionId()
     if (existingSession) {
       console.log('[Connection] Existing session found, redirecting to dashboard')
       router.push('/dashboard')
+      return
+    }
+
+    const searchParams = new URLSearchParams(window.location.search)
+    const codeParam = searchParams.get('code')
+    
+    if (codeParam && /^\d{6}$/.test(codeParam)) {
+      console.log('[Connection] 6-digit code found in URL:', codeParam)
+      setInitialCode(codeParam)
     }
   }, [router])
 
@@ -107,6 +117,7 @@ export default function Home() {
               onComplete={handleCodeComplete}
               disabled={isLoading}
               error={error}
+              initialValue={initialCode}
             />
             {isLoading && (
               <div className={cn("flex items-center justify-center gap-2 text-sm opacity-70", themeColors.text)}>
