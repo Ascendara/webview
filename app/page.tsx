@@ -60,8 +60,6 @@ export default function Home() {
           cache: 'no-cache',
         })
         
-        console.log('[Monitor] Response status:', response.status)
-        
         if (response.status === 429) {
           console.log('[Monitor] Rate limited (429) - treating as online')
           sessionStorage.setItem('monitor_status', 'online')
@@ -70,7 +68,7 @@ export default function Home() {
         }
         
         if (!response.ok || response.status === 1033 || response.status === 502) {
-          console.error('[Monitor] Endpoint offline - status:', response.status)
+          console.error('[Monitor] Endpoint offline or returned 1033')
           sessionStorage.setItem('monitor_status', 'offline')
           setMonitorOffline(true)
           setCheckingMonitor(false)
@@ -81,9 +79,8 @@ export default function Home() {
         sessionStorage.setItem('monitor_status', 'online')
         setCheckingMonitor(false)
       } catch (error) {
-        console.error('[Monitor] Network/CORS error - treating as OFFLINE:', error)
-        sessionStorage.setItem('monitor_status', 'offline')
-        setMonitorOffline(true)
+        console.warn('[Monitor] CORS/Network error (treating as online):', error)
+        sessionStorage.setItem('monitor_status', 'online')
         setCheckingMonitor(false)
       }
     }
