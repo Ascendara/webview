@@ -17,6 +17,10 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     return cachedKey;
   }
 
+  if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
+    throw new Error('Web Crypto API not available. Ensure you are in a secure context (HTTPS).');
+  }
+
   if (!ENCRYPTION_KEY_BASE64) {
     throw new Error('Encryption key not configured. Set NEXT_PUBLIC_ENCRYPTION_KEY environment variable.');
   }
@@ -26,7 +30,7 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     const keyData = Uint8Array.from(atob(ENCRYPTION_KEY_BASE64), c => c.charCodeAt(0));
 
     // Import the key for AES-GCM
-    cachedKey = await crypto.subtle.importKey(
+    cachedKey = await window.crypto.subtle.importKey(
       'raw',
       keyData,
       { name: 'AES-GCM', length: 256 },
@@ -74,7 +78,7 @@ export async function decryptData(encryptedPackage: any): Promise<any> {
     console.log('[Crypto] Ciphertext bytes:', ciphertext.length);
 
     // Decrypt using AES-GCM
-    const decryptedData = await crypto.subtle.decrypt(
+    const decryptedData = await window.crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
         iv: nonce,

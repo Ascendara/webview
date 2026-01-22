@@ -12,7 +12,7 @@ import { BottomNavbar } from '@/components/bottom-navbar'
 import { apiClient, Download } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
-import { RefreshCw, LogOut, Download as DownloadIcon, Inbox, AlertTriangle, Users, Circle } from 'lucide-react'
+import { RefreshCw, LogOut, Download as DownloadIcon, Inbox, AlertTriangle, Users, Circle, Coffee } from 'lucide-react'
 import { config } from '@/lib/config'
 import { cn } from '@/lib/utils'
 import {
@@ -43,9 +43,42 @@ export default function Dashboard() {
     photoURL: string;
     status: { status: string; customMessage: string };
   }>>([])
-  const pausedDownloadCache = React.useRef<Map<string, { progress: number; downloaded: string }>>(new Map())
+  const CACHE_KEY = 'ascendara_paused_downloads_cache'
+  
+  // Initialize cache from localStorage
+  const initialCache = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(CACHE_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          console.log('[Dashboard] Loaded cache from localStorage:', parsed)
+          return new Map(Object.entries(parsed))
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error loading cache from localStorage:', error)
+      }
+    }
+    return new Map()
+  }, [])
+  
+  const pausedDownloadCache = React.useRef<Map<string, { progress: number; downloaded: string }>>(initialCache)
+  
   const previousDownloadsRef = React.useRef<Map<string, Download>>(new Map())
   const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null)
+  
+  // Helper to save cache to localStorage
+  const saveCacheToLocalStorage = React.useCallback(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cacheObj = Object.fromEntries(pausedDownloadCache.current)
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheObj))
+        console.log('[Dashboard] Saved cache to localStorage:', cacheObj)
+      } catch (error) {
+        console.error('[Dashboard] Error saving cache to localStorage:', error)
+      }
+    }
+  }, [])
 
   React.useEffect(() => {
     const sessionId = apiClient.getSessionId()
@@ -154,6 +187,7 @@ export default function Dashboard() {
                   progress: previousDownload.progress,
                   downloaded: previousDownload.downloaded
                 })
+                saveCacheToLocalStorage()
                 console.log(`[Dashboard] ✓ Cached on transition for ${download.id}:`, { 
                   progress: previousDownload.progress, 
                   downloaded: previousDownload.downloaded 
@@ -166,6 +200,7 @@ export default function Dashboard() {
                   progress: download.progress,
                   downloaded: download.downloaded
                 })
+                saveCacheToLocalStorage()
                 console.log(`[Dashboard] Cached from API for ${download.id}:`, { 
                   progress: download.progress, 
                   downloaded: download.downloaded 
@@ -187,6 +222,7 @@ export default function Dashboard() {
               if (pausedDownloadCache.current.has(download.id)) {
                 console.log(`[Dashboard] Clearing cache for resumed ${download.id}`)
                 pausedDownloadCache.current.delete(download.id)
+                saveCacheToLocalStorage()
               }
             }
             
@@ -294,6 +330,7 @@ export default function Dashboard() {
                 progress: previousDownload.progress,
                 downloaded: previousDownload.downloaded
               })
+              saveCacheToLocalStorage()
               console.log(`[Dashboard/Refresh] ✓ Cached on transition for ${download.id}:`, { 
                 progress: previousDownload.progress, 
                 downloaded: previousDownload.downloaded 
@@ -306,6 +343,7 @@ export default function Dashboard() {
                 progress: download.progress,
                 downloaded: download.downloaded
               })
+              saveCacheToLocalStorage()
               console.log(`[Dashboard/Refresh] Cached from API for ${download.id}:`, { 
                 progress: download.progress, 
                 downloaded: download.downloaded 
@@ -325,6 +363,7 @@ export default function Dashboard() {
             if (pausedDownloadCache.current.has(download.id)) {
               console.log(`[Dashboard/Refresh] Clearing cache for resumed ${download.id}`)
               pausedDownloadCache.current.delete(download.id)
+              saveCacheToLocalStorage()
             }
           }
           
@@ -358,6 +397,7 @@ export default function Dashboard() {
           progress: download.progress,
           downloaded: download.downloaded
         })
+        saveCacheToLocalStorage()
         console.log(`[Dashboard] Pre-cached progress before pause for ${id}:`, { progress: download.progress, downloaded: download.downloaded })
       }
       
@@ -494,6 +534,7 @@ export default function Dashboard() {
           if (pausedDownloadCache.current.has(id)) {
             console.log(`[Dashboard] Clearing cached progress for resumed download ${id}`)
             pausedDownloadCache.current.delete(id)
+            saveCacheToLocalStorage()
           }
           
           toast({
@@ -694,9 +735,9 @@ export default function Dashboard() {
         ) : downloads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mb-4", themeColors.secondary)}>
-              <Inbox className={cn("h-10 w-10 opacity-50", themeColors.text)} />
+              <Coffee className={cn("h-10 w-10 opacity-50", themeColors.text)} />
             </div>
-            <h2 className={cn("text-2xl font-semibold mb-2", themeColors.text)}>No Active Downloads</h2>
+            <h2 className={cn("text-2xl font-semibold mb-2", themeColors.text)}>Hm... Relaxing...</h2>
             <p className={cn("max-w-md opacity-70", themeColors.text)}>
               Start a download in Ascendara to monitor it here
             </p>

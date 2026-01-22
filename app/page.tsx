@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
 import { Loader, Loader2, Smartphone, Unplug } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog'
 
 export default function Home() {
   const router = useRouter()
@@ -22,8 +23,67 @@ export default function Home() {
   const [showThemeSelector, setShowThemeSelector] = React.useState(false)
   const [initialCode, setInitialCode] = React.useState<string>('')
   const [autoConnecting, setAutoConnecting] = React.useState(false)
+  const [monitorOffline, setMonitorOffline] = React.useState(false)
+  const [checkingMonitor, setCheckingMonitor] = React.useState(true)
+  const hasCheckedMonitor = React.useRef(false)
 
   React.useEffect(() => {
+    if (hasCheckedMonitor.current) {
+      const cachedStatus = sessionStorage.getItem('monitor_status')
+      if (cachedStatus === 'online') {
+        setCheckingMonitor(false)
+        return
+      } else if (cachedStatus === 'offline') {
+        setMonitorOffline(true)
+        setCheckingMonitor(false)
+        return
+      }
+    }
+
+    const checkMonitorEndpoint = async () => {
+      if (hasCheckedMonitor.current) return
+      hasCheckedMonitor.current = true
+
+      try {
+        console.log('[Monitor] Checking monitor endpoint...')
+        const response = await fetch('https://monitor.ascendara.app', {
+          method: 'GET',
+          cache: 'no-cache',
+        })
+        
+        if (response.status === 429) {
+          console.log('[Monitor] Rate limited (429) - treating as online')
+          sessionStorage.setItem('monitor_status', 'online')
+          setCheckingMonitor(false)
+          return
+        }
+        
+        if (!response.ok || response.status === 1033) {
+          console.error('[Monitor] Endpoint offline or returned 1033')
+          sessionStorage.setItem('monitor_status', 'offline')
+          setMonitorOffline(true)
+          setCheckingMonitor(false)
+          return
+        }
+        
+        console.log('[Monitor] Endpoint is online')
+        sessionStorage.setItem('monitor_status', 'online')
+        setCheckingMonitor(false)
+      } catch (error) {
+        console.warn('[Monitor] CORS/Network error (treating as online):', error)
+        sessionStorage.setItem('monitor_status', 'online')
+        setCheckingMonitor(false)
+      }
+    }
+
+    checkMonitorEndpoint()
+  }, [])
+
+  React.useEffect(() => {
+    if (checkingMonitor || monitorOffline) {
+      return
+    }
+
     const existingSession = apiClient.getSessionId()
     if (existingSession) {
       console.log('[Connection] Existing session found, redirecting to dashboard')
@@ -40,7 +100,7 @@ export default function Home() {
       setAutoConnecting(true)
       handleCodeComplete(codeParam)
     }
-  }, [router])
+  }, [router, checkingMonitor, monitorOffline])
 
   const handleCodeComplete = async (code: string) => {
     console.log('[Connection] Code input completed:', code)
@@ -93,6 +153,23 @@ export default function Home() {
       })
       setIsLoading(false)
     }
+  }
+
+  if (checkingMonitor) {
+    return (
+      <div className={cn("flex min-h-screen items-center justify-center bg-gradient-to-br p-4", themeColors.bg)}>
+        <Card className={cn("w-full max-w-md shadow-lg border", themeColors.card)}>
+          <CardContent className="py-16">
+            <div className="flex flex-col items-center justify-center space-y-6">
+              <Loader className={cn("h-8 w-8 animate-spin", themeColors.accent)} />
+              <p className={cn("text-sm opacity-70", themeColors.text)}>
+                Checking service status...
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (autoConnecting) {
@@ -179,6 +256,22 @@ export default function Home() {
         isOpen={showThemeSelector} 
         onClose={() => setShowThemeSelector(false)} 
       />
+
+      <AlertDialog open={monitorOffline} onOpenChange={setMonitorOffline}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Service Unavailable</AlertDialogTitle>
+            <AlertDialogDescription>
+              The monitor endpoint is offline and Webview cannot be accessed at this time. Please join our Discord for more information and updates.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => window.open('https://discord.gg/ascendara', '_blank')}>
+              Join Discord
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

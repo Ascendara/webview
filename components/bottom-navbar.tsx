@@ -1,15 +1,22 @@
 'use client'
 
+import * as React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/contexts/theme-context'
-import { VERSION } from '@/lib/version'
+import { Shield } from 'lucide-react'
 
 export function BottomNavbar() {
   const { themeColors } = useTheme()
   const pathname = usePathname()
+  const [isMonitorOnline, setIsMonitorOnline] = React.useState(false)
+
+  React.useEffect(() => {
+    const monitorStatus = sessionStorage.getItem('monitor_status')
+    setIsMonitorOnline(monitorStatus === 'online')
+  }, [])
 
   return (
     <div className={cn(
@@ -25,11 +32,20 @@ export function BottomNavbar() {
             </div>
             <div className="flex flex-col">
               <span className={cn("text-sm font-semibold leading-none", themeColors.text)}>
-                Ascendara
+                Ascendara Webview
               </span>
-              <span className={cn("text-xs leading-none mt-0.5 opacity-70", themeColors.text)}>
-                Download Monitor v{VERSION.monitor}
-              </span>
+              {isMonitorOnline && (
+                <div className={cn(
+                  "text-xs leading-none mt-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md",
+                  "bg-emerald-500/10 border border-emerald-500/20",
+                  "animate-in fade-in slide-in-from-left-2 duration-500"
+                )}>
+                  <Shield className="h-3 w-3 text-emerald-500 animate-pulse" />
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    Encrypted Connection
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           
