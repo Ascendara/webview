@@ -29,7 +29,6 @@ Ascendara Monitor is a mobile-first web application that acts as a remote monito
 - **Styling**: Tailwind CSS v4
 - **UI Components**: shadcn/ui (New York style)
 - **Icons**: Lucide React
-- **Backend API**: https://monitor.ascendara.app
 
 ## 💻 Building From Source
 

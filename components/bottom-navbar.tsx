@@ -46,7 +46,7 @@ export function BottomNavbar() {
               Join Discord
             </a>
             <a
-              href="https://github.com/tagoWorks/ascendara"
+              href="https://github.com/ascendara/webview"
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
