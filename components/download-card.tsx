@@ -30,6 +30,7 @@ interface DownloadCardProps {
 export function DownloadCard({ download, onPause, onResume, onCancel, disabled = false }: DownloadCardProps) {
   const { themeColors } = useTheme()
   const [showKillDialog, setShowKillDialog] = React.useState(false)
+  const [loadingAction, setLoadingAction] = React.useState<'pause' | 'resume' | 'kill' | null>(null)
 
   React.useEffect(() => {
     if (download.status === 'paused' || download.status === 'stopped') {
@@ -40,6 +41,10 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
       })
     }
   }, [download])
+
+  React.useEffect(() => {
+    setLoadingAction(null)
+  }, [download.status])
 
   const getStatusIcon = () => {
     switch (download.status) {
@@ -111,10 +116,13 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={() => onPause(download.id)}
-              disabled={disabled}
+              onClick={() => {
+                setLoadingAction('pause')
+                onPause(download.id)
+              }}
+              disabled={disabled || loadingAction !== null}
             >
-              {disabled ? (
+              {loadingAction === 'pause' ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Pause className="h-4 w-4 mr-2" />
@@ -127,10 +135,13 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={() => onResume(download.id)}
-              disabled={disabled}
+              onClick={() => {
+                setLoadingAction('resume')
+                onResume(download.id)
+              }}
+              disabled={disabled || loadingAction !== null}
             >
-              {disabled ? (
+              {loadingAction === 'resume' ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Play className="h-4 w-4 mr-2" />
@@ -144,9 +155,9 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
               size="sm"
               className="flex-1"
               onClick={() => setShowKillDialog(true)}
-              disabled={disabled}
+              disabled={disabled || loadingAction !== null}
             >
-              {disabled ? (
+              {loadingAction === 'kill' ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -183,6 +194,7 @@ export function DownloadCard({ download, onPause, onResume, onCancel, disabled =
               variant="destructive"
               onClick={() => {
                 setShowKillDialog(false)
+                setLoadingAction('kill')
                 onCancel(download.id)
               }}
               className="w-full sm:w-auto"

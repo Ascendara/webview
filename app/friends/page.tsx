@@ -56,9 +56,18 @@ export default function Friends() {
     }
 
     let isMounted = true
+    
+    // Reset fetching flag on mount
+    isFetchingRef.current = false
 
     const fetchFriends = async (showLoading = false) => {
-      if (!isMounted || isFetchingRef.current) return
+      if (!isMounted) return
+      
+      // Skip if already fetching (prevents duplicate requests)
+      if (isFetchingRef.current) {
+        console.log('[Friends] Already fetching, skipping...')
+        return
+      }
       
       isFetchingRef.current = true
       if (showLoading) setIsRefreshing(true)
@@ -126,21 +135,37 @@ export default function Friends() {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
+      isFetchingRef.current = false
     }
   }, [])
 
   const handleRefresh = async () => {
+    if (isFetchingRef.current) {
+      console.log('[Friends] Already fetching, skipping manual refresh')
+      return
+    }
+    
     setIsRefreshing(true)
+    isFetchingRef.current = true
+    
     try {
       const response = await apiClient.getFriends()
       if (response.success && response.data) {
         setFriends(response.data.friends)
+        errorCountRef.current = 0
         toast({
           title: 'Refreshed',
           description: 'Friends list updated',
         })
+      } else {
+        toast({
+          title: 'Error',
+          description: response.error || 'Failed to refresh friends list',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
+      console.error('[Friends] Refresh error:', error)
       toast({
         title: 'Error',
         description: 'Failed to refresh friends list',
@@ -148,6 +173,7 @@ export default function Friends() {
       })
     } finally {
       setIsRefreshing(false)
+      isFetchingRef.current = false
     }
   }
 

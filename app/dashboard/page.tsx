@@ -193,9 +193,9 @@ export default function Dashboard() {
             return download
           })
           
-          // Update previousDownloadsRef with RAW API data (not cached)
-          // This allows us to detect transitions on the next poll
-          response.data.downloads.forEach(download => {
+          // Update previousDownloadsRef with DISPLAYED data (with cache applied)
+          // This ensures we have the correct values to cache on the next transition
+          downloadsWithCache.forEach(download => {
             previousDownloadsRef.current.set(download.id, download)
           })
           
@@ -331,8 +331,8 @@ export default function Dashboard() {
           return download
         })
         
-        // Update previousDownloadsRef with RAW API data (not cached)
-        response.data.downloads.forEach(download => {
+        // Update previousDownloadsRef with DISPLAYED data (with cache applied)
+        downloadsWithCache.forEach(download => {
           previousDownloadsRef.current.set(download.id, download)
         })
         
@@ -399,8 +399,8 @@ export default function Dashboard() {
                 return d
               })
               
-              // Update previousDownloadsRef with RAW API data (not cached)
-              downloadsResponse.data.downloads.forEach(download => {
+              // Update previousDownloadsRef with DISPLAYED data (with cache applied)
+              downloadsWithCache.forEach(download => {
                 previousDownloadsRef.current.set(download.id, download)
               })
               
