@@ -87,6 +87,9 @@ export default function Dashboard() {
       return
     }
 
+    // Clear any previous session error flag on mount
+    sessionStorage.removeItem('session_error')
+
     let isMounted = true
     console.log('[Dashboard] Effect running, isMounted:', isMounted)
     console.log('[Dashboard] Setting up polling with interval:', config.pollingInterval, 'ms')
@@ -131,6 +134,9 @@ export default function Dashboard() {
         if (!isMounted) return
 
         if (response.success && response.data) {
+          // Clear session error flag on successful fetch
+          sessionStorage.removeItem('session_error')
+          
           // Check if there are new downloads and show immediate feedback
           if (response.data.hasNewDownloads && response.data.newDownloadsInfo && response.data.newDownloadsInfo.length > 0) {
             console.log('[Dashboard] New downloads detected:', response.data.newDownloadsInfo)
@@ -269,6 +275,8 @@ export default function Dashboard() {
           if (response.error?.includes('Unauthorized') || response.error?.includes('session')) {
             // Session was revoked or expired - show alert dialog
             console.warn('[Dashboard] Session expired or revoked:', response.error)
+            sessionStorage.setItem('session_error', 'true')
+            window.dispatchEvent(new Event('session-error'))
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current)
               pollingIntervalRef.current = null

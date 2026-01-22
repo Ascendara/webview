@@ -6,16 +6,59 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/contexts/theme-context'
-import { Shield } from 'lucide-react'
+import { Shield, WifiOff } from 'lucide-react'
 
 export function BottomNavbar() {
   const { themeColors } = useTheme()
   const pathname = usePathname()
   const [isMonitorOnline, setIsMonitorOnline] = React.useState(false)
+  const [connectionStatus, setConnectionStatus] = React.useState<'connected' | 'disconnected'>('disconnected')
 
   React.useEffect(() => {
     const monitorStatus = sessionStorage.getItem('monitor_status')
     setIsMonitorOnline(monitorStatus === 'online')
+    
+    // Check initial connection status
+    const checkConnectionStatus = () => {
+      const sessionError = sessionStorage.getItem('session_error')
+      const sessionId = typeof window !== 'undefined' ? localStorage.getItem('ascendara_session_id') : null
+      
+      // Prioritize session error flag - if it's set, we're disconnected
+      if (sessionError === 'true') {
+        setConnectionStatus('disconnected')
+      } else if (!sessionId) {
+        setConnectionStatus('disconnected')
+      } else {
+        setConnectionStatus('connected')
+      }
+    }
+    
+    checkConnectionStatus()
+    
+    // Listen for storage events to update status in real-time
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'ascendara_session_id' || e.key === null) {
+        checkConnectionStatus()
+      }
+    }
+    
+    // Listen for custom session error events (fired by dashboard)
+    const handleSessionError = () => {
+      console.log('[BottomNavbar] Session error event received')
+      checkConnectionStatus()
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('session-error', handleSessionError)
+    
+    // Poll connection status more frequently (every 500ms) for responsive updates
+    const interval = setInterval(checkConnectionStatus, 500)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('session-error', handleSessionError)
+      clearInterval(interval)
+    }
   }, [])
 
   return (
@@ -36,14 +79,27 @@ export function BottomNavbar() {
               </span>
               {isMonitorOnline && (
                 <div className={cn(
-                  "text-xs leading-none mt-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md",
-                  "bg-emerald-500/10 border border-emerald-500/20",
+                  "text-xs leading-none mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md w-fit",
+                  connectionStatus === 'connected' 
+                    ? "bg-emerald-500/10 border border-emerald-500/20"
+                    : "bg-red-500/10 border border-red-500/20",
                   "animate-in fade-in slide-in-from-left-2 duration-500"
                 )}>
-                  <Shield className="h-3 w-3 text-emerald-500 animate-pulse" />
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    Encrypted Connection
-                  </span>
+                  {connectionStatus === 'connected' ? (
+                    <>
+                      <Shield className="h-3 w-3 text-emerald-500 animate-pulse" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                       Encrypted Connection
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-3 w-3 text-red-500" />
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        Disconnected
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
