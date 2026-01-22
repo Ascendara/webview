@@ -24,8 +24,45 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { isDevMode } from '@/lib/dev-mode'
+import { MockDashboard } from '@/components/mock-dashboard'
 
 export default function Dashboard() {
+  const router = useRouter()
+  const [isMockMode, setIsMockMode] = React.useState(false)
+  const [isChecking, setIsChecking] = React.useState(true)
+  
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mockMode = localStorage.getItem('mock_mode') === 'true'
+      const inMockMode = isDevMode() && mockMode
+      setIsMockMode(inMockMode)
+      
+      if (!inMockMode) {
+        const sessionId = apiClient.getSessionId()
+        if (!sessionId) {
+          console.log('[Dashboard] No session found, redirecting to connection page')
+          router.push('/')
+          return
+        }
+      }
+      
+      setIsChecking(false)
+    }
+  }, [router])
+  
+  if (isChecking) {
+    return null
+  }
+  
+  if (isMockMode) {
+    return <MockDashboard />
+  }
+  
+  return <RealDashboard />
+}
+
+function RealDashboard() {
   const router = useRouter()
   const { toast } = useToast()
   const { themeColors } = useTheme()
@@ -81,12 +118,6 @@ export default function Dashboard() {
   }, [])
 
   React.useEffect(() => {
-    const sessionId = apiClient.getSessionId()
-    if (!sessionId) {
-      router.push('/')
-      return
-    }
-
     // Clear any previous session error flag on mount
     sessionStorage.removeItem('session_error')
 
@@ -819,7 +850,7 @@ export default function Dashboard() {
                                   'h-3 w-3 rounded-full border-2',
                                   friend.status.status === 'online' && 'bg-green-500',
                                   friend.status.status === 'away' && 'bg-yellow-500',
-                                  friend.status.status === 'dnd' && 'bg-red-500'
+                                  friend.status.status === 'busy' && 'bg-red-500'
                                 )}
                                 style={{ borderColor: themeColors.card.split(' ')[0].includes('bg-') ? '#ffffff' : themeColors.card }}
                                 fill="currentColor"

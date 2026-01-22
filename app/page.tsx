@@ -10,9 +10,10 @@ import { ThemeButton } from '@/components/theme-button'
 import { apiClient } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
-import { Loader, Loader2, Smartphone, Unplug } from 'lucide-react'
+import { Loader, Loader2, Smartphone, Unplug, Code } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog'
+import { isDevMode, DEV_MOCK_CODE } from '@/lib/dev-mode'
 
 export default function Home() {
   const router = useRouter()
@@ -26,8 +27,16 @@ export default function Home() {
   const [monitorOffline, setMonitorOffline] = React.useState(false)
   const [checkingMonitor, setCheckingMonitor] = React.useState(true)
   const hasCheckedMonitor = React.useRef(false)
+  const isProcessingCode = React.useRef(false)
 
   React.useEffect(() => {
+    if (isDevMode()) {
+      console.log('[Monitor] Dev mode detected, skipping monitor check')
+      setCheckingMonitor(false)
+      sessionStorage.setItem('monitor_status', 'online')
+      return
+    }
+
     if (hasCheckedMonitor.current) {
       const cachedStatus = sessionStorage.getItem('monitor_status')
       if (cachedStatus === 'online') {
@@ -103,9 +112,32 @@ export default function Home() {
   }, [router, checkingMonitor, monitorOffline])
 
   const handleCodeComplete = async (code: string) => {
+    if (isProcessingCode.current) {
+      console.log('[Connection] Already processing a code, ignoring duplicate call')
+      return
+    }
+    
+    isProcessingCode.current = true
     console.log('[Connection] Code input completed:', code)
     console.log('[Connection] Code length:', code.length)
     console.log('[Connection] Code is numeric:', /^\d+$/.test(code))
+    
+    if (isDevMode() && code === DEV_MOCK_CODE) {
+      console.log('[Connection] Dev mock code detected, routing to mock dashboard')
+      setIsLoading(true)
+      
+      localStorage.setItem('mock_mode', 'true')
+      
+      toast({
+        title: 'Dev Mode Activated',
+        description: 'Connected to mock dashboard',
+      })
+      
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 500)
+      return
+    }
     
     setIsLoading(true)
     setError(false)
@@ -134,6 +166,7 @@ export default function Home() {
         console.error('[Connection] Verification failed:', response.error)
         setError(true)
         setAutoConnecting(false)
+        isProcessingCode.current = false
         toast({
           title: 'Connection Failed',
           description: response.error || 'Invalid or expired code',
@@ -146,6 +179,7 @@ export default function Home() {
       console.error('[Connection] Error details:', err instanceof Error ? err.message : 'Unknown error')
       setError(true)
       setAutoConnecting(false)
+      isProcessingCode.current = false
       toast({
         title: 'Connection Error',
         description: 'Unable to connect to Ascendara',
@@ -208,6 +242,27 @@ export default function Home() {
         <div className="absolute top-4 right-4">
           <ThemeButton onClick={() => setShowThemeSelector(true)} />
         </div>
+        
+        {isDevMode() && (
+          <div className="fixed bottom-4 left-4 z-50">
+            <div className={cn(
+              "px-3 py-2 rounded-lg border backdrop-blur-lg shadow-lg",
+              "bg-purple-500/10 border-purple-500/20"
+            )}>
+              <div className="flex items-center gap-2">
+                <Code className="h-4 w-4 text-purple-500" />
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 leading-none">
+                    Developer Mode
+                  </span>
+                  <span className="text-[10px] text-purple-600/70 dark:text-purple-400/70 leading-none mt-0.5">
+                    Use code: 123456
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         <Card className={cn("w-full max-w-md shadow-lg border", themeColors.card)}>
           <CardHeader className="text-center space-y-4">

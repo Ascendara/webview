@@ -79,6 +79,14 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    if (typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true') {
+      console.warn('[API] BLOCKED: Real API call attempted in mock mode:', endpoint)
+      return {
+        success: false,
+        error: 'API calls are disabled in mock mode',
+      }
+    }
+    
     console.log(`[API] Making request to: ${API_BASE_URL}${endpoint}`)
     console.log('[API] Request options:', options)
     

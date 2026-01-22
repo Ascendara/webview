@@ -133,6 +133,47 @@ Webview/
 4. Enter the code in the web app
 5. Start monitoring your downloads
 
+### 🧪 Development Mode (Mock Dashboard)
+
+For UI development and testing without requiring a real backend connection, the app includes a **dev mock mode**:
+
+#### Activating Dev Mode
+
+1. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+2. Navigate to [http://localhost:3000](http://localhost:3000)
+
+3. Enter the connection code: **`123456`**
+
+4. You'll be redirected to a mock dashboard with simulated data
+
+#### Dev Mode Features
+
+- **No Real API Calls**: All backend calls are blocked in mock mode to prevent accidental production requests
+- **Fake Download Data**: Randomly generated game downloads with realistic names and sizes
+- **Simulated Progress**: Download progress bars update automatically every 2 seconds
+- **Full UI Testing**: Test pause, resume, and cancel actions without affecting real downloads
+- **Visual Indicator**: A purple "DEVELOPMENT" badge appears in the bottom navbar
+- **Safe Disconnect**: Exiting mock mode clears the dev session without affecting real data
+
+#### Important Notes
+
+- **Production Safety**: Dev mode only works when `NODE_ENV === 'development'`
+- **No Backend Required**: Perfect for frontend development and UI iteration
+- **Isolated Environment**: Mock mode uses separate localStorage keys and never touches real sessions
+- **API Protection**: The API client automatically blocks all real network requests when mock mode is active
+
+#### Use Cases
+
+- Rapid UI prototyping and iteration
+- Testing theme changes and animations
+- Developing new download card layouts
+- Testing loading states and empty states
+- Component development without backend dependencies
+
 ### Download Management
 
 - **Pause**: Temporarily stop a download
