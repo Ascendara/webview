@@ -1,5 +1,5 @@
 import { config } from './config'
-import { decryptApiResponse } from './crypto'
+import { encryptE2EData, decryptE2EData } from './crypto'
 
 const API_BASE_URL = config.apiBaseUrl;
 
@@ -217,13 +217,23 @@ class ApiClient {
     
     if (response.success && response.data) {
       try {
-        const decryptedData = await decryptApiResponse<DownloadsResponse>(response.data);
+        // Check if data is E2E encrypted
+        if (response.data.e2e_encrypted) {
+          console.log('[API] Decrypting E2E encrypted downloads data');
+          const decryptedData = await decryptE2EData(response.data, userId);
+          return {
+            success: true,
+            data: decryptedData as DownloadsResponse
+          };
+        }
+        
+        // Plain JSON (for backward compatibility or non-sensitive data)
         return {
           success: true,
-          data: decryptedData
+          data: response.data as DownloadsResponse
         };
       } catch (error) {
-        console.error('[API] Failed to decrypt downloads:', error);
+        console.error('[API] Failed to decrypt E2E data:', error);
         return {
           success: false,
           error: 'Failed to decrypt data'
@@ -287,17 +297,35 @@ class ApiClient {
 
   async getUserName(): Promise<ApiResponse<{ displayName: string; userId: string }>> {
     console.log('[API] Fetching username');
+    const userId = this.getUserId();
+    if (!userId) {
+      return {
+        success: false,
+        error: 'No user ID found'
+      };
+    }
+    
     const response = await this.request<any>('/getusername');
     
     if (response.success && response.data) {
       try {
-        const decryptedData = await decryptApiResponse<{ displayName: string; userId: string }>(response.data);
+        // Check if data is E2E encrypted
+        if (response.data.e2e_encrypted) {
+          console.log('[API] Decrypting E2E encrypted username data');
+          const decryptedData = await decryptE2EData(response.data, userId);
+          return {
+            success: true,
+            data: decryptedData as { displayName: string; userId: string }
+          };
+        }
+        
+        // Plain JSON (for backward compatibility)
         return {
           success: true,
-          data: decryptedData
+          data: response.data as { displayName: string; userId: string }
         };
       } catch (error) {
-        console.error('[API] Failed to decrypt username:', error);
+        console.error('[API] Failed to decrypt E2E data:', error);
         return {
           success: false,
           error: 'Failed to decrypt data'
@@ -310,17 +338,35 @@ class ApiClient {
 
   async checkNotifications(): Promise<ApiResponse<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>> {
     console.log('[API] Checking for new download notifications');
+    const userId = this.getUserId();
+    if (!userId) {
+      return {
+        success: false,
+        error: 'No user ID found'
+      };
+    }
+    
     const response = await this.request<any>('/downloads/check-notifications');
     
     if (response.success && response.data) {
       try {
-        const decryptedData = await decryptApiResponse<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>(response.data);
+        // Check if data is E2E encrypted
+        if (response.data.e2e_encrypted) {
+          console.log('[API] Decrypting E2E encrypted notifications data');
+          const decryptedData = await decryptE2EData(response.data, userId);
+          return {
+            success: true,
+            data: decryptedData as { hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }
+          };
+        }
+        
+        // Plain JSON (for backward compatibility)
         return {
           success: true,
-          data: decryptedData
+          data: response.data as { hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }
         };
       } catch (error) {
-        console.error('[API] Failed to decrypt notifications:', error);
+        console.error('[API] Failed to decrypt E2E data:', error);
         return {
           success: false,
           error: 'Failed to decrypt data'
@@ -373,6 +419,14 @@ class ApiClient {
     };
   }> }>> {
     console.log('[API] Fetching friends list');
+    const userId = this.getUserId();
+    if (!userId) {
+      return {
+        success: false,
+        error: 'No user ID found'
+      };
+    }
+    
     const response = await this.request<any>('/get-friends', {
       method: 'POST',
       body: JSON.stringify({}),
@@ -380,24 +434,45 @@ class ApiClient {
     
     if (response.success && response.data) {
       try {
-        const decryptedData = await decryptApiResponse<{ friends: Array<{
-          uid: string;
-          displayName: string;
-          email: string;
-          photoURL: string;
-          status: {
-            status: string;
-            preferredStatus: string;
-            customMessage: string;
-            updatedAt?: string;
+        // Check if data is E2E encrypted
+        if (response.data.e2e_encrypted) {
+          console.log('[API] Decrypting E2E encrypted friends data');
+          const decryptedData = await decryptE2EData(response.data, userId);
+          return {
+            success: true,
+            data: decryptedData as { friends: Array<{
+              uid: string;
+              displayName: string;
+              email: string;
+              photoURL: string;
+              status: {
+                status: string;
+                preferredStatus: string;
+                customMessage: string;
+                updatedAt?: string;
+              };
+            }> }
           };
-        }> }>(response.data);
+        }
+        
+        // Plain JSON (for backward compatibility)
         return {
           success: true,
-          data: decryptedData
+          data: response.data as { friends: Array<{
+            uid: string;
+            displayName: string;
+            email: string;
+            photoURL: string;
+            status: {
+              status: string;
+              preferredStatus: string;
+              customMessage: string;
+              updatedAt?: string;
+            };
+          }> }
         };
       } catch (error) {
-        console.error('[API] Failed to decrypt friends data:', error);
+        console.error('[API] Failed to decrypt E2E data:', error);
         return {
           success: false,
           error: 'Failed to decrypt data'
