@@ -1,5 +1,5 @@
 export const VERSION = {
-  monitor: '2.6',
+  monitor: '3.6',
   api: '4.0',
 } as const
 
