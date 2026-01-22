@@ -122,7 +122,7 @@ export default function Dashboard() {
           const downloadsWithCache = response.data.downloads.map(download => {
             const previousDownload = previousDownloadsRef.current.get(download.id)
             
-            // Check if download is paused/stopped
+            // Detect transition from downloading/queued to paused/stopped
             if ((download.status === 'paused' || download.status === 'stopped')) {
               console.log(`[Dashboard] Processing paused download ${download.id}, current API values:`, { 
                 progress: download.progress, 
@@ -130,39 +130,46 @@ export default function Dashboard() {
                 hasCache: pausedDownloadCache.current.has(download.id)
               })
               
-              // If we have previous data with progress > 0, cache it before it gets lost
-              if (previousDownload && previousDownload.progress > 0 && 
-                  (previousDownload.status === 'downloading' || previousDownload.status === 'queued')) {
+              // Cache on transition: if previous was downloading/queued and had progress
+              if (previousDownload && 
+                  (previousDownload.status === 'downloading' || previousDownload.status === 'queued') &&
+                  previousDownload.progress > 0) {
                 pausedDownloadCache.current.set(download.id, {
                   progress: previousDownload.progress,
                   downloaded: previousDownload.downloaded
                 })
-                console.log(`[Dashboard] Cached values on pause transition for ${download.id}:`, { progress: previousDownload.progress, downloaded: previousDownload.downloaded })
+                console.log(`[Dashboard] ✓ Cached on transition for ${download.id}:`, { 
+                  progress: previousDownload.progress, 
+                  downloaded: previousDownload.downloaded 
+                })
               }
               
-              // If download still has progress, cache it
-              if (download.progress > 0) {
+              // If API still has progress (shouldn't happen but handle it), cache it
+              if (download.progress > 0 && !pausedDownloadCache.current.has(download.id)) {
                 pausedDownloadCache.current.set(download.id, {
                   progress: download.progress,
                   downloaded: download.downloaded
                 })
-                console.log(`[Dashboard] Cached current values for paused download ${download.id}:`, { progress: download.progress, downloaded: download.downloaded })
+                console.log(`[Dashboard] Cached from API for ${download.id}:`, { 
+                  progress: download.progress, 
+                  downloaded: download.downloaded 
+                })
               }
               
-              // Always use cached values if available for paused downloads
+              // Apply cached values
               const cached = pausedDownloadCache.current.get(download.id)
               if (cached) {
-                console.log(`[Dashboard] ✓ Applying cached values for paused download ${download.id}:`, cached)
+                console.log(`[Dashboard] ✓ Applying cache for ${download.id}:`, cached)
                 return { ...download, progress: cached.progress, downloaded: cached.downloaded }
               } else {
-                console.warn(`[Dashboard] ⚠ No cache found for paused download ${download.id}!`)
+                console.warn(`[Dashboard] ⚠ No cache for paused ${download.id}!`)
               }
             }
             
             // Clear cache when download resumes
             if (download.status === 'downloading' || download.status === 'queued') {
               if (pausedDownloadCache.current.has(download.id)) {
-                console.log(`[Dashboard] Clearing cache for resumed download ${download.id}`)
+                console.log(`[Dashboard] Clearing cache for resumed ${download.id}`)
                 pausedDownloadCache.current.delete(download.id)
               }
             }
@@ -170,8 +177,9 @@ export default function Dashboard() {
             return download
           })
           
-          // Update previous downloads reference with the CACHED versions
-          downloadsWithCache.forEach(download => {
+          // Update previousDownloadsRef with RAW API data (not cached)
+          // This allows us to detect transitions on the next poll
+          response.data.downloads.forEach(download => {
             previousDownloadsRef.current.set(download.id, download)
           })
           
@@ -254,29 +262,50 @@ export default function Dashboard() {
           const previousDownload = previousDownloadsRef.current.get(download.id)
           
           if ((download.status === 'paused' || download.status === 'stopped')) {
-            if (previousDownload && previousDownload.progress > 0 && 
-                (previousDownload.status === 'downloading' || previousDownload.status === 'queued')) {
+            console.log(`[Dashboard/Refresh] Processing paused download ${download.id}, current API values:`, { 
+              progress: download.progress, 
+              downloaded: download.downloaded,
+              hasCache: pausedDownloadCache.current.has(download.id)
+            })
+            
+            // Cache on transition: if previous was downloading/queued and had progress
+            if (previousDownload && 
+                (previousDownload.status === 'downloading' || previousDownload.status === 'queued') &&
+                previousDownload.progress > 0) {
               pausedDownloadCache.current.set(download.id, {
                 progress: previousDownload.progress,
                 downloaded: previousDownload.downloaded
               })
+              console.log(`[Dashboard/Refresh] ✓ Cached on transition for ${download.id}:`, { 
+                progress: previousDownload.progress, 
+                downloaded: previousDownload.downloaded 
+              })
             }
             
-            if (download.progress > 0) {
+            // If API still has progress (shouldn't happen but handle it), cache it
+            if (download.progress > 0 && !pausedDownloadCache.current.has(download.id)) {
               pausedDownloadCache.current.set(download.id, {
                 progress: download.progress,
                 downloaded: download.downloaded
+              })
+              console.log(`[Dashboard/Refresh] Cached from API for ${download.id}:`, { 
+                progress: download.progress, 
+                downloaded: download.downloaded 
               })
             }
             
             const cached = pausedDownloadCache.current.get(download.id)
             if (cached) {
+              console.log(`[Dashboard/Refresh] ✓ Applying cache for ${download.id}:`, cached)
               return { ...download, progress: cached.progress, downloaded: cached.downloaded }
+            } else {
+              console.warn(`[Dashboard/Refresh] ⚠ No cache for paused ${download.id}!`)
             }
           }
           
           if (download.status === 'downloading' || download.status === 'queued') {
             if (pausedDownloadCache.current.has(download.id)) {
+              console.log(`[Dashboard/Refresh] Clearing cache for resumed ${download.id}`)
               pausedDownloadCache.current.delete(download.id)
             }
           }
@@ -284,7 +313,8 @@ export default function Dashboard() {
           return download
         })
         
-        downloadsWithCache.forEach(download => {
+        // Update previousDownloadsRef with RAW API data (not cached)
+        response.data.downloads.forEach(download => {
           previousDownloadsRef.current.set(download.id, download)
         })
         
@@ -351,7 +381,8 @@ export default function Dashboard() {
                 return d
               })
               
-              downloadsWithCache.forEach(download => {
+              // Update previousDownloadsRef with RAW API data (not cached)
+              downloadsResponse.data.downloads.forEach(download => {
                 previousDownloadsRef.current.set(download.id, download)
               })
               
