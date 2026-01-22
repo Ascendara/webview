@@ -15,11 +15,13 @@ Ascendara Monitor is a mobile-first web application that acts as a remote monito
 ## ✨ Key Features
 
 - **6-Digit Connection Code**: Secure connection to Ascendara desktop app using a simple 6-digit code
+- **End-to-End Encryption**: All communications are encrypted end-to-end on the production webview at [webview.ascendara.app](https://webview.ascendara.app/)
 - **Real-time Download Monitoring**: View active, paused, completed, and failed downloads
 - **Download Controls**: Pause, resume, and cancel downloads remotely
 - **Auto-refresh**: Downloads update automatically every 30 seconds
 - **Mobile-first Design**: Optimized for mobile devices with responsive layout
-- **Dark Mode Support**: Automatic dark mode support
+- **Theme Customization**: Multiple theme options with dark mode support
+- **PWA Support**: Install as a Progressive Web App on mobile devices
 - **Modern UI**: Built with shadcn/ui components and Tailwind CSS
 
 ## 🔧 Tech Stack
@@ -68,23 +70,57 @@ npm start
 ```
 Webview/
 ├── app/
+│   ├── [code]/
+│   │   └── page.tsx           # Dynamic code route handler
 │   ├── dashboard/
-│   │   └── page.tsx          # Dashboard with download monitoring
-│   ├── globals.css            # Global styles
-│   ├── layout.tsx             # Root layout with Toaster
+│   │   └── page.tsx           # Dashboard with download monitoring
+│   ├── error.tsx              # Error boundary
+│   ├── favicon.ico            # App icon
+│   ├── globals.css            # Global styles and theme variables
+│   ├── layout.tsx             # Root layout with providers
+│   ├── loading.tsx            # Loading state
+│   ├── manifest.ts            # PWA manifest configuration
+│   ├── not-found.tsx          # 404 page
 │   └── page.tsx               # Connection page (home)
 ├── components/
 │   ├── ui/                    # shadcn/ui components
+│   │   ├── alert-dialog.tsx   # Alert dialog component
+│   │   ├── button.tsx         # Button component
+│   │   ├── card.tsx           # Card component
+│   │   ├── input.tsx          # Input component
+│   │   ├── progress.tsx       # Progress bar component
+│   │   ├── skeleton.tsx       # Skeleton loader
+│   │   ├── toast.tsx          # Toast notification
+│   │   └── toaster.tsx        # Toast container
+│   ├── bottom-navbar.tsx      # Mobile bottom navigation
 │   ├── code-input.tsx         # 6-digit code input component
+│   ├── connection-guard.tsx   # Connection state guard
 │   ├── download-card.tsx      # Download card with controls
-│   └── download-skeleton.tsx  # Loading skeleton
+│   ├── download-skeleton.tsx  # Download loading skeleton
+│   ├── install-prompt.tsx     # PWA install prompt
+│   ├── theme-button.tsx       # Theme toggle button
+│   ├── theme-selector-modal.tsx # Theme selection modal
+│   └── theme-selector.tsx     # Theme picker component
+├── contexts/
+│   └── theme-context.tsx      # Theme context provider
 ├── hooks/
 │   └── use-toast.ts           # Toast notification hook
 ├── lib/
 │   ├── api.ts                 # API client and types
+│   ├── config.ts              # App configuration
+│   ├── crypto.ts              # End-to-end encryption utilities
 │   ├── format.ts              # Formatting utilities
-│   └── utils.ts               # Utility functions
-└── types/                     # TypeScript type definitions
+│   ├── themes.ts              # Theme definitions
+│   ├── utils.ts               # Utility functions
+│   └── version.ts             # App version
+├── types/
+│   ├── cache-life.d.ts        # Cache lifetime type definitions
+│   └── routes.d.ts            # Route type definitions
+├── .env.example               # Environment variables template
+├── components.json            # shadcn/ui configuration
+├── next.config.ts             # Next.js configuration
+├── package.json               # Dependencies and scripts
+└── tsconfig.json              # TypeScript configuration
 ```
 
 ## 🚀 Usage
