@@ -34,6 +34,9 @@ export interface Download {
 export interface DownloadsResponse {
   downloads: Download[];
   lastUpdated: string;
+  hasNewDownloads: boolean;
+  newDownloadIds: string[];
+  newDownloadsInfo: Array<{ id: string; name: string }>;
 }
 
 class ApiClient {

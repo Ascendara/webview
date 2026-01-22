@@ -40,7 +40,6 @@ export default function Dashboard() {
   const pausedDownloadCache = React.useRef<Map<string, { progress: number; downloaded: string }>>(new Map())
   const previousDownloadsRef = React.useRef<Map<string, Download>>(new Map())
   const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null)
-  const notificationPollingRef = React.useRef<NodeJS.Timeout | null>(null)
 
   React.useEffect(() => {
     const sessionId = apiClient.getSessionId()
@@ -65,24 +64,6 @@ export default function Dashboard() {
       }
     }
     
-    const checkForNewDownloads = async () => {
-      if (!isMounted) return
-      
-      try {
-        const response = await apiClient.checkNotifications()
-        if (response.success && response.data?.hasNewDownloads) {
-          console.log('[Dashboard] New download detected! Fetching downloads immediately...')
-          if (response.data.notifications.length > 0) {
-            const downloadNames = response.data.notifications.map(n => n.downloadName).join(', ')
-            console.log('[Dashboard] New downloads:', downloadNames)
-          }
-          // Immediately fetch downloads when notification received
-          await fetchDownloads(false)
-        }
-      } catch (error) {
-        console.error('[Dashboard] Error checking notifications:', error)
-      }
-    }
     
     const fetchDownloads = async (showLoading = false) => {
       if (!isMounted) {
@@ -101,6 +82,43 @@ export default function Dashboard() {
         if (!isMounted) return
 
         if (response.success && response.data) {
+          // Check if there are new downloads and show immediate feedback
+          if (response.data.hasNewDownloads && response.data.newDownloadsInfo && response.data.newDownloadsInfo.length > 0) {
+            console.log('[Dashboard] New downloads detected:', response.data.newDownloadsInfo)
+            
+            // Create placeholder downloads for instant feedback
+            const placeholderDownloads: Download[] = response.data.newDownloadsInfo.map(downloadInfo => {
+              // Check if this download is already in the response
+              const existingDownload = response.data!.downloads.find(d => d.id === downloadInfo.id)
+              if (existingDownload) {
+                return existingDownload
+              }
+              
+              // Create placeholder for downloads not yet in the list with actual name
+              return {
+                id: downloadInfo.id,
+                name: downloadInfo.name,
+                status: 'queued' as const,
+                progress: 0,
+                downloaded: '0 B',
+                size: 'Unknown',
+                speed: '0 B/s',
+                eta: 'Calculating...',
+                error: null,
+                paused: false,
+                stopped: false,
+                timestamp: new Date().toISOString()
+              }
+            })
+            
+            // Add placeholders immediately
+            setDownloads(prev => {
+              const existingIds = new Set(prev.map(d => d.id))
+              const newPlaceholders = placeholderDownloads.filter(p => !existingIds.has(p.id))
+              return [...newPlaceholders, ...prev]
+            })
+          }
+          
           const downloadsWithCache = response.data.downloads.map(download => {
             const previousDownload = previousDownloadsRef.current.get(download.id)
             
@@ -157,7 +175,16 @@ export default function Dashboard() {
             previousDownloadsRef.current.set(download.id, download)
           })
           
-          setDownloads(downloadsWithCache)
+          // Merge with existing downloads to preserve placeholders that haven't appeared in API yet
+          setDownloads(prev => {
+            const apiDownloadIds = new Set(downloadsWithCache.map(d => d.id))
+            // Keep placeholders that aren't in the API response yet (they're still being processed)
+            const preservedPlaceholders = prev.filter(d => 
+              !apiDownloadIds.has(d.id) && d.status === 'queued' && d.eta === 'Calculating...'
+            )
+            // Combine API downloads with preserved placeholders
+            return [...downloadsWithCache, ...preservedPlaceholders]
+          })
           setLastUpdated(new Date())
         } else {
           if (response.error?.includes('Unauthorized') || response.error?.includes('session')) {
@@ -187,7 +214,7 @@ export default function Dashboard() {
       } finally {
         if (isMounted) {
           setIsLoading(false)
-          if (showLoading) setIsRefreshing(false)
+          setIsRefreshing(false)
         }
       }
     }
@@ -206,19 +233,6 @@ export default function Dashboard() {
     }, config.pollingInterval)
     
     console.log('[Dashboard] Polling interval created with ID:', pollingIntervalRef.current)
-    
-    // Set up notification polling (more frequent than download polling)
-    if (notificationPollingRef.current) {
-      console.log('[Dashboard] Clearing existing notification interval')
-      clearInterval(notificationPollingRef.current)
-    }
-    
-    notificationPollingRef.current = setInterval(() => {
-      console.log('[Dashboard] Notification polling triggered')
-      checkForNewDownloads()
-    }, 2000) // Check every 2 seconds for new downloads
-    
-    console.log('[Dashboard] Notification polling created with ID:', notificationPollingRef.current)
 
     return () => {
       console.log('[Dashboard] Cleanup function called')
@@ -227,11 +241,6 @@ export default function Dashboard() {
         console.log('[Dashboard] Clearing interval:', pollingIntervalRef.current)
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
-      }
-      if (notificationPollingRef.current) {
-        console.log('[Dashboard] Clearing notification interval:', notificationPollingRef.current)
-        clearInterval(notificationPollingRef.current)
-        notificationPollingRef.current = null
       }
     }
   }, [])
