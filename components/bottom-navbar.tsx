@@ -5,6 +5,7 @@ import { Download, Home, Settings } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/contexts/theme-context'
+import { VERSION } from '@/lib/version'
 
 export function BottomNavbar() {
   const { themeColors } = useTheme()
@@ -26,7 +27,7 @@ export function BottomNavbar() {
                 Ascendara
               </span>
               <span className={cn("text-xs leading-none mt-0.5 opacity-70", themeColors.text)}>
-                Download Monitor
+                Download Monitor v{VERSION.monitor}
               </span>
             </div>
           </div>

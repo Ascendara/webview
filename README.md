@@ -1,8 +1,18 @@
-# Ascendara Monitor
+<div align="center">
+    <img align="center" width="128" height="128" src="./readme/icon.png" alt="Ascendara Logo">
+    <h1>Ascendara Monitor</h1>
+    <p>
+        <img src="https://img.shields.io/github/last-commit/ascendara/webview" alt="Last Commit">
+        <a href="https://ascendara.app/"><img src="https://img.shields.io/badge/website-ascendara.app-blue" alt="Website"></a>
+        <img src="https://img.shields.io/github/license/ascendara/webview" alt="License">
+    </p>
+</div>
 
-A mobile-first web application that acts as a remote monitoring and control companion for Ascendara downloads. Built with Next.js, TypeScript, and Tailwind CSS.
+## 📦 About
 
-## Features
+Ascendara Monitor is a mobile-first web application that acts as a remote monitoring and control companion for Ascendara downloads. Built with Next.js, TypeScript, and Tailwind CSS, it provides a seamless experience for managing your downloads from anywhere.
+
+## ✨ Key Features
 
 - **6-Digit Connection Code**: Secure connection to Ascendara desktop app using a simple 6-digit code
 - **Real-time Download Monitoring**: View active, paused, completed, and failed downloads
@@ -12,7 +22,7 @@ A mobile-first web application that acts as a remote monitoring and control comp
 - **Dark Mode Support**: Automatic dark mode support
 - **Modern UI**: Built with shadcn/ui components and Tailwind CSS
 
-## Tech Stack
+## 🔧 Tech Stack
 
 - **Framework**: Next.js 16 with App Router
 - **Language**: TypeScript
@@ -21,34 +31,40 @@ A mobile-first web application that acts as a remote monitoring and control comp
 - **Icons**: Lucide React
 - **Backend API**: https://monitor.ascendara.app
 
-## Getting Started
+## 💻 Building From Source
 
 ### Prerequisites
-
 - Node.js 20 or higher
 - npm, yarn, pnpm, or bun
 
-### Installation
+### Setup and Run
+1. Clone the repository
+   ```bash
+   git clone https://github.com/ascendara/webview.git
+   cd webview
+   ```
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd Webview
-```
+2. Install dependencies
+   ```bash
+   npm install
+   ```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Run the development server:
-```bash
-npm run dev
-```
+3. Run the development server
+   ```bash
+   npm run dev
+   ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-## Project Structure
+### Building for Production
+To build a production-ready application:
+
+```bash
+npm run build
+npm start
+```
+
+## 📁 Project Structure
 
 ```
 Webview/
@@ -72,7 +88,7 @@ Webview/
 └── types/                     # TypeScript type definitions
 ```
 
-## Usage
+## 🚀 Usage
 
 ### Connecting to Ascendara
 
@@ -89,9 +105,9 @@ Webview/
 - **Cancel**: Stop and remove a download
 - **Auto-refresh**: Downloads update every 30 seconds automatically (configurable)
 
-## API Integration
+## 🔌 API Integration
 
-The application communicates with the backend at `https://monitor.ascendara.app` using the following endpoints:
+The application requires a backend API server to function. You'll need to set up your own monitor endpoint that implements the following API:
 
 - `POST /verify-code` - Verify connection code
 - `GET /downloads` - Fetch active downloads
@@ -100,51 +116,20 @@ The application communicates with the backend at `https://monitor.ascendara.app`
 - `POST /downloads/:id/cancel` - Cancel a download
 - `GET /check-connection` - Check connection status
 
-## Development
+Configure your API endpoint in the application settings or environment variables.
 
-### Building for Production
+## 📝 License & Contact  
 
-```bash
-npm run build
-npm start
-```
+This project is part of the Ascendara ecosystem
 
-### Linting
+Licensed under [CC BY-NC 1.0 Universal](./LICENSE) - 2025 tagoWorks
 
-```bash
-npm run lint
-```
+### Get in Touch
+- Email: [santiago@tago.works](mailto:santiago@tago.works)
+- Website: [tago.works](https://tago.works)
+- Discord: [Join our community](https://ascendara.app/discord)
 
-## Features in Detail
-
-### Connection Page
-- 6 individual digit inputs with auto-focus and auto-advance
-- Backspace navigation between inputs
-- Paste support for quick code entry
-- Loading and error states
-- Clear helper text
-
-### Dashboard
-- Categorized downloads (Active, Paused, Completed, Failed)
-- Real-time progress bars
-- Download speed and ETA display
-- File size information
-- Action buttons for each download
-- Empty state when no downloads
-- Sticky header with refresh and disconnect buttons
-
-### UI/UX
-- Mobile-first responsive design
-- Smooth animations and transitions
-- Toast notifications for user feedback
-- Loading skeletons for better perceived performance
-- Error handling with user-friendly messages
-- Dark mode support
-
-## License
-
-This project is part of the Ascendara ecosystem.
-
-## Support
-
-For issues or questions, please refer to the main Ascendara documentation.
+---
+<div align="center">
+    <sub>Built with 💖 by <a href="https://tago.works">tago</a></sub>
+</div>
