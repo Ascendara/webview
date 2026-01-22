@@ -1,14 +1,17 @@
 'use client'
 
 import * as React from 'react'
-import { Download, Home, Settings } from 'lucide-react'
+import { Download, Home, Settings, Users } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/contexts/theme-context'
 import { VERSION } from '@/lib/version'
 
 export function BottomNavbar() {
   const { themeColors } = useTheme()
+  const pathname = usePathname()
 
   return (
     <div className={cn(
@@ -33,6 +36,30 @@ export function BottomNavbar() {
           </div>
           
           <div className="flex items-center gap-1">
+            <Link
+              href="/dashboard"
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                "hover:bg-accent hover:text-accent-foreground",
+                pathname === '/dashboard' ? 'bg-accent' : '',
+                themeColors.text
+              )}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Downloads
+            </Link>
+            <Link
+              href="/friends"
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                "hover:bg-accent hover:text-accent-foreground",
+                pathname === '/friends' ? 'bg-accent' : '',
+                themeColors.text
+              )}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Friends
+            </Link>
             <a
               href="https://ascendara.app/discord"
               target="_blank"

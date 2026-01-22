@@ -12,7 +12,7 @@ import { BottomNavbar } from '@/components/bottom-navbar'
 import { apiClient, Download } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
-import { RefreshCw, LogOut, Download as DownloadIcon, Inbox, AlertTriangle } from 'lucide-react'
+import { RefreshCw, LogOut, Download as DownloadIcon, Inbox, AlertTriangle, Users, Circle } from 'lucide-react'
 import { config } from '@/lib/config'
 import { cn } from '@/lib/utils'
 import {
@@ -37,6 +37,12 @@ export default function Dashboard() {
   const [showSessionExpiredDialog, setShowSessionExpiredDialog] = React.useState(false)
   const [loadingDownloads, setLoadingDownloads] = React.useState<Set<string>>(new Set())
   const [userName, setUserName] = React.useState<string>('')
+  const [friends, setFriends] = React.useState<Array<{
+    uid: string;
+    displayName: string;
+    photoURL: string;
+    status: { status: string; customMessage: string };
+  }>>([])
   const pausedDownloadCache = React.useRef<Map<string, { progress: number; downloaded: string }>>(new Map())
   const previousDownloadsRef = React.useRef<Map<string, Download>>(new Map())
   const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null)
@@ -64,6 +70,16 @@ export default function Dashboard() {
       }
     }
     
+    const fetchFriends = async () => {
+      try {
+        const response = await apiClient.getFriends()
+        if (response.success && response.data) {
+          setFriends(response.data.friends)
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error fetching friends:', error)
+      }
+    }
     
     const fetchDownloads = async (showLoading = false) => {
       if (!isMounted) {
@@ -228,6 +244,7 @@ export default function Dashboard() {
     }
     
     fetchUserName()
+    fetchFriends()
     fetchDownloads()
 
     if (pollingIntervalRef.current) {
@@ -238,6 +255,7 @@ export default function Dashboard() {
     pollingIntervalRef.current = setInterval(() => {
       console.log('[Dashboard] Polling interval triggered')
       fetchDownloads(false)
+      fetchFriends()
     }, config.pollingInterval)
     
     console.log('[Dashboard] Polling interval created with ID:', pollingIntervalRef.current)
@@ -762,6 +780,78 @@ export default function Dashboard() {
                       disabled={loadingDownloads.has(download.id)}
                     />
                   ))}
+                </div>
+              </div>
+            )}
+
+            {friends.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className={cn("text-lg font-semibold flex items-center gap-2", themeColors.text)}>
+                    <Users className="h-5 w-5" />
+                    Friends ({friends.filter(f => f.status.status !== 'offline').length} online)
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push('/friends')}
+                    className={cn("text-xs", themeColors.text)}
+                  >
+                    View All
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {friends
+                    .filter(f => f.status.status !== 'offline')
+                    .slice(0, 6)
+                    .map((friend) => (
+                      <div
+                        key={friend.uid}
+                        className={cn(
+                          "rounded-lg p-3 transition-all duration-200 hover:scale-[1.02] border",
+                          themeColors.card,
+                          themeColors.border
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            {friend.photoURL ? (
+                              <img 
+                                src={friend.photoURL} 
+                                alt={friend.displayName}
+                                className="h-10 w-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
+                                {friend.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </div>
+                            )}
+                            <div className="absolute -bottom-0.5 -right-0.5">
+                              <Circle
+                                className={cn(
+                                  'h-3 w-3 rounded-full border-2',
+                                  friend.status.status === 'online' && 'bg-green-500',
+                                  friend.status.status === 'away' && 'bg-yellow-500',
+                                  friend.status.status === 'dnd' && 'bg-red-500'
+                                )}
+                                style={{ borderColor: themeColors.card.split(' ')[0].includes('bg-') ? '#ffffff' : themeColors.card }}
+                                fill="currentColor"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className={cn("font-medium text-sm truncate", themeColors.text)}>
+                              {friend.displayName}
+                            </h3>
+                            {friend.status.customMessage && (
+                              <p className={cn("text-xs opacity-70 truncate", themeColors.text)}>
+                                {friend.status.customMessage}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}

@@ -359,6 +359,54 @@ class ApiClient {
     
     return result;
   }
+
+  async getFriends(): Promise<ApiResponse<{ friends: Array<{
+    uid: string;
+    displayName: string;
+    email: string;
+    photoURL: string;
+    status: {
+      status: string;
+      preferredStatus: string;
+      customMessage: string;
+      updatedAt?: string;
+    };
+  }> }>> {
+    console.log('[API] Fetching friends list');
+    const response = await this.request<any>('/get-friends', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    
+    if (response.success && response.data) {
+      try {
+        const decryptedData = await decryptApiResponse<{ friends: Array<{
+          uid: string;
+          displayName: string;
+          email: string;
+          photoURL: string;
+          status: {
+            status: string;
+            preferredStatus: string;
+            customMessage: string;
+            updatedAt?: string;
+          };
+        }> }>(response.data);
+        return {
+          success: true,
+          data: decryptedData
+        };
+      } catch (error) {
+        console.error('[API] Failed to decrypt friends data:', error);
+        return {
+          success: false,
+          error: 'Failed to decrypt data'
+        };
+      }
+    }
+    
+    return response;
+  }
 }
 
 export const apiClient = new ApiClient();
