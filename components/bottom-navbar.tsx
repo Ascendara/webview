@@ -1,7 +1,5 @@
 'use client'
 
-import * as React from 'react'
-import { Download, Home, Settings, Users } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -45,7 +43,6 @@ export function BottomNavbar() {
                 themeColors.text
               )}
             >
-              <Download className="h-3.5 w-3.5" />
               Downloads
             </Link>
             <Link
@@ -57,33 +54,8 @@ export function BottomNavbar() {
                 themeColors.text
               )}
             >
-              <Users className="h-3.5 w-3.5" />
               Friends
             </Link>
-            <a
-              href="https://ascendara.app/discord"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
-                themeColors.text
-              )}
-            >
-              Join Discord
-            </a>
-            <a
-              href="https://github.com/ascendara/webview"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
-                themeColors.text
-              )}
-            >
-              GitHub
-            </a>
           </div>
         </div>
       </div>
