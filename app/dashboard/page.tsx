@@ -168,8 +168,24 @@ export default function Dashboard() {
             })
           }
           
+          let cacheUpdated = false
+          
           const downloadsWithCache = response.data.downloads.map(download => {
             const previousDownload = previousDownloadsRef.current.get(download.id)
+            
+            // Update previousDownloadsRef for actively downloading items BEFORE processing paused state
+            // This ensures we capture the last known good state before any transition
+            if ((download.status === 'downloading' || download.status === 'queued' || download.status === 'extracting') && download.progress > 0) {
+              previousDownloadsRef.current.set(download.id, download)
+              
+              // Also continuously update the pause cache for active downloads
+              // This ensures we always have the latest progress to restore if paused
+              pausedDownloadCache.current.set(download.id, {
+                progress: download.progress,
+                downloaded: download.downloaded
+              })
+              cacheUpdated = true
+            }
             
             // Detect transition from downloading/queued to paused/stopped
             if ((download.status === 'paused' || download.status === 'stopped')) {
@@ -229,6 +245,11 @@ export default function Dashboard() {
             return download
           })
           
+          // Save cache to localStorage if it was updated
+          if (cacheUpdated) {
+            saveCacheToLocalStorage()
+          }
+          
           // Update previousDownloadsRef with DISPLAYED data (with cache applied)
           // This ensures we have the correct values to cache on the next transition
           downloadsWithCache.forEach(download => {
@@ -238,11 +259,9 @@ export default function Dashboard() {
           // Merge with existing downloads to preserve placeholders that haven't appeared in API yet
           setDownloads(prev => {
             const apiDownloadIds = new Set(downloadsWithCache.map(d => d.id))
-            // Keep placeholders that aren't in the API response yet (they're still being processed)
             const preservedPlaceholders = prev.filter(d => 
               !apiDownloadIds.has(d.id) && d.status === 'queued' && d.eta === 'Calculating...'
             )
-            // Combine API downloads with preserved placeholders
             return [...downloadsWithCache, ...preservedPlaceholders]
           })
           setLastUpdated(new Date())
@@ -312,8 +331,22 @@ export default function Dashboard() {
     try {
       const response = await apiClient.getDownloads()
       if (response.success && response.data) {
+        let cacheUpdated = false
+        
         const downloadsWithCache = response.data.downloads.map(download => {
           const previousDownload = previousDownloadsRef.current.get(download.id)
+          
+          // Update previousDownloadsRef for actively downloading items BEFORE processing paused state
+          if ((download.status === 'downloading' || download.status === 'queued' || download.status === 'extracting') && download.progress > 0) {
+            previousDownloadsRef.current.set(download.id, download)
+            
+            // Also continuously update the pause cache for active downloads
+            pausedDownloadCache.current.set(download.id, {
+              progress: download.progress,
+              downloaded: download.downloaded
+            })
+            cacheUpdated = true
+          }
           
           if ((download.status === 'paused' || download.status === 'stopped')) {
             console.log(`[Dashboard/Refresh] Processing paused download ${download.id}, current API values:`, { 
@@ -370,6 +403,11 @@ export default function Dashboard() {
           return download
         })
         
+        // Save cache to localStorage if it was updated
+        if (cacheUpdated) {
+          saveCacheToLocalStorage()
+        }
+        
         // Update previousDownloadsRef with DISPLAYED data (with cache applied)
         downloadsWithCache.forEach(download => {
           previousDownloadsRef.current.set(download.id, download)
@@ -390,83 +428,59 @@ export default function Dashboard() {
     try {
       console.log('[Dashboard] Pausing download:', id)
       
-      // Cache the current progress BEFORE pausing
-      const download = downloads.find(d => d.id === id)
-      if (download && download.progress > 0) {
+      // Fetch fresh download data from API to get current progress before pausing
+      console.log('[Dashboard] Fetching fresh download data before pause...')
+      const freshDataResponse = await apiClient.getDownloads()
+      
+      let downloadToCache = null
+      
+      if (freshDataResponse.success && freshDataResponse.data) {
+        const freshDownload = freshDataResponse.data.downloads.find(d => d.id === id)
+        if (freshDownload && freshDownload.progress > 0) {
+          downloadToCache = freshDownload
+          console.log('[Dashboard] Found fresh download data from API:', {
+            progress: freshDownload.progress,
+            downloaded: freshDownload.downloaded,
+            status: freshDownload.status
+          })
+        }
+      }
+      
+      // Fallback to previousDownloadsRef or current state if API didn't have progress
+      if (!downloadToCache) {
+        const previousDownload = previousDownloadsRef.current.get(id)
+        const currentDownload = downloads.find(d => d.id === id)
+        downloadToCache = (previousDownload && previousDownload.progress > 0) ? previousDownload : currentDownload
+        console.log('[Dashboard] Using fallback data source:', {
+          source: downloadToCache === previousDownload ? 'previousRef' : 'currentState',
+          progress: downloadToCache?.progress,
+          downloaded: downloadToCache?.downloaded
+        })
+      }
+      
+      // Cache the progress data
+      if (downloadToCache && downloadToCache.progress > 0) {
         pausedDownloadCache.current.set(id, {
-          progress: download.progress,
-          downloaded: download.downloaded
+          progress: downloadToCache.progress,
+          downloaded: downloadToCache.downloaded
         })
         saveCacheToLocalStorage()
-        console.log(`[Dashboard] Pre-cached progress before pause for ${id}:`, { progress: download.progress, downloaded: download.downloaded })
+        console.log(`[Dashboard] ✓ Cached progress before pause for ${id}:`, { 
+          progress: downloadToCache.progress, 
+          downloaded: downloadToCache.downloaded
+        })
+      } else {
+        console.error(`[Dashboard] ✗ Could not cache - no valid progress data for ${id}`)
       }
       
       const response = await apiClient.pauseDownload(id)
-      console.log('[Dashboard] Pause command queued:', response)
+      console.log('[Dashboard] Pause command sent:', response)
       
       if (response.success) {
-        // Command queued successfully, now wait for status change
-        console.log('[Dashboard] Waiting for download to pause...')
-        
-        // Poll for status change (max 30 seconds)
-        const maxAttempts = 60 // 60 attempts * 500ms = 30 seconds
-        let attempts = 0
-        
-        const checkStatus = async (): Promise<boolean> => {
-          if (attempts >= maxAttempts) {
-            console.log('[Dashboard] Timeout waiting for pause confirmation')
-            return false
-          }
-          
-          attempts++
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          const downloadsResponse = await apiClient.getDownloads()
-          if (downloadsResponse.success && downloadsResponse.data) {
-            const download = downloadsResponse.data.downloads.find(d => d.id === id)
-            if (download && (download.status === 'paused' || download.status === 'stopped')) {
-              console.log('[Dashboard] Download paused successfully')
-              
-              // Apply cached values immediately
-              const downloadsWithCache = downloadsResponse.data.downloads.map(d => {
-                if (d.id === id) {
-                  const cached = pausedDownloadCache.current.get(id)
-                  if (cached) {
-                    console.log(`[Dashboard] Applying cached values immediately for ${id}:`, cached)
-                    return { ...d, progress: cached.progress, downloaded: cached.downloaded }
-                  }
-                }
-                return d
-              })
-              
-              // Update previousDownloadsRef with DISPLAYED data (with cache applied)
-              downloadsWithCache.forEach(download => {
-                previousDownloadsRef.current.set(download.id, download)
-              })
-              
-              setDownloads(downloadsWithCache)
-              setLastUpdated(new Date())
-              return true
-            }
-          }
-          
-          return checkStatus()
-        }
-        
-        const success = await checkStatus()
-        
-        if (success) {
-          toast({
-            title: 'Download Paused',
-            description: 'Download has been paused',
-          })
-        } else {
-          toast({
-            title: 'Pause Timeout',
-            description: 'Command sent but status not confirmed',
-            variant: 'destructive',
-          })
-        }
+        toast({
+          title: 'Pause Command Sent',
+          description: 'Download will pause shortly',
+        })
       } else {
         toast({
           title: 'Failed to pause',
@@ -495,59 +509,19 @@ export default function Dashboard() {
     try {
       console.log('[Dashboard] Resuming download:', id)
       const response = await apiClient.resumeDownload(id)
-      console.log('[Dashboard] Resume command queued:', response)
+      console.log('[Dashboard] Resume command sent:', response)
       
       if (response.success) {
-        // Command queued successfully, now wait for status change
-        console.log('[Dashboard] Waiting for download to resume...')
-        
-        // Poll for status change (max 30 seconds)
-        const maxAttempts = 60
-        let attempts = 0
-        
-        const checkStatus = async (): Promise<boolean> => {
-          if (attempts >= maxAttempts) {
-            console.log('[Dashboard] Timeout waiting for resume confirmation')
-            return false
-          }
-          
-          attempts++
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          const downloadsResponse = await apiClient.getDownloads()
-          if (downloadsResponse.success && downloadsResponse.data) {
-            const download = downloadsResponse.data.downloads.find(d => d.id === id)
-            if (download && (download.status === 'downloading' || download.status === 'queued')) {
-              console.log('[Dashboard] Download resumed successfully')
-              setDownloads(downloadsResponse.data.downloads)
-              setLastUpdated(new Date())
-              return true
-            }
-          }
-          
-          return checkStatus()
+        if (pausedDownloadCache.current.has(id)) {
+          console.log(`[Dashboard] Clearing cached progress for resumed download ${id}`)
+          pausedDownloadCache.current.delete(id)
+          saveCacheToLocalStorage()
         }
         
-        const success = await checkStatus()
-        
-        if (success) {
-          if (pausedDownloadCache.current.has(id)) {
-            console.log(`[Dashboard] Clearing cached progress for resumed download ${id}`)
-            pausedDownloadCache.current.delete(id)
-            saveCacheToLocalStorage()
-          }
-          
-          toast({
-            title: 'Download Resumed',
-            description: 'Download has been resumed',
-          })
-        } else {
-          toast({
-            title: 'Resume Timeout',
-            description: 'Command sent but status not confirmed',
-            variant: 'destructive',
-          })
-        }
+        toast({
+          title: 'Resume Command Sent',
+          description: 'Download will resume shortly',
+        })
       } else {
         toast({
           title: 'Failed to resume',
@@ -576,54 +550,18 @@ export default function Dashboard() {
     try {
       console.log('[Dashboard] Killing download:', id)
       const response = await apiClient.cancelDownload(id)
-      console.log('[Dashboard] Kill command queued:', response)
+      console.log('[Dashboard] Kill command sent:', response)
       
       if (response.success) {
-        // Command queued successfully, now wait for download to disappear or change status
-        console.log('[Dashboard] Waiting for download to be killed...')
-        
-        // Poll for status change (max 30 seconds)
-        const maxAttempts = 60
-        let attempts = 0
-        
-        const checkStatus = async (): Promise<boolean> => {
-          if (attempts >= maxAttempts) {
-            console.log('[Dashboard] Timeout waiting for kill confirmation')
-            return false
-          }
-          
-          attempts++
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          const downloadsResponse = await apiClient.getDownloads()
-          if (downloadsResponse.success && downloadsResponse.data) {
-            const download = downloadsResponse.data.downloads.find(d => d.id === id)
-            // Download should be removed or marked as error/completed
-            if (!download || download.status === 'error' || download.status === 'completed') {
-              console.log('[Dashboard] Download killed successfully')
-              setDownloads(downloadsResponse.data.downloads)
-              setLastUpdated(new Date())
-              return true
-            }
-          }
-          
-          return checkStatus()
+        if (pausedDownloadCache.current.has(id)) {
+          pausedDownloadCache.current.delete(id)
+          saveCacheToLocalStorage()
         }
         
-        const success = await checkStatus()
-        
-        if (success) {
-          toast({
-            title: 'Download Killed',
-            description: 'Download has been killed',
-          })
-        } else {
-          toast({
-            title: 'Kill Timeout',
-            description: 'Command sent but status not confirmed',
-            variant: 'destructive',
-          })
-        }
+        toast({
+          title: 'Kill Command Sent',
+          description: 'Download will be removed shortly',
+        })
       } else {
         toast({
           title: 'Failed to kill',
