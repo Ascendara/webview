@@ -58,7 +58,7 @@ export default function Home() {
           return
         }
         
-        if (!response.ok || response.status === 1033) {
+        if (!response.ok || response.status === 1033 || response.status === 502) {
           console.error('[Monitor] Endpoint offline or returned 1033')
           sessionStorage.setItem('monitor_status', 'offline')
           setMonitorOffline(true)
