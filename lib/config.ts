@@ -1,7 +1,7 @@
 export const config = {
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://monitor.ascendara.app',
-  pollingInterval: parseInt(process.env.NEXT_PUBLIC_POLLING_INTERVAL || '10000', 10),
-  appName: process.env.NEXT_PUBLIC_APP_NAME || 'Ascendara Monitor',
+  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
+  pollingInterval: 10000,
+  appName: 'Ascendara Monitor',
 } as const
 
 // Log configuration on load

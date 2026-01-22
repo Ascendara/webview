@@ -1,4 +1,5 @@
 import { config } from './config'
+import { decryptApiResponse } from './crypto'
 
 const API_BASE_URL = config.apiBaseUrl;
 
@@ -209,7 +210,25 @@ class ApiClient {
     }
     
     console.log('[API] Fetching downloads for user:', userId);
-    return this.request<DownloadsResponse>(`/downloads/${userId}`);
+    const response = await this.request<any>(`/downloads/${userId}`);
+    
+    if (response.success && response.data) {
+      try {
+        const decryptedData = await decryptApiResponse<DownloadsResponse>(response.data);
+        return {
+          success: true,
+          data: decryptedData
+        };
+      } catch (error) {
+        console.error('[API] Failed to decrypt downloads:', error);
+        return {
+          success: false,
+          error: 'Failed to decrypt data'
+        };
+      }
+    }
+    
+    return response;
   }
   
   getUserId(): string | null {
@@ -265,12 +284,48 @@ class ApiClient {
 
   async getUserName(): Promise<ApiResponse<{ displayName: string; userId: string }>> {
     console.log('[API] Fetching username');
-    return this.request<{ displayName: string; userId: string }>('/getusername');
+    const response = await this.request<any>('/getusername');
+    
+    if (response.success && response.data) {
+      try {
+        const decryptedData = await decryptApiResponse<{ displayName: string; userId: string }>(response.data);
+        return {
+          success: true,
+          data: decryptedData
+        };
+      } catch (error) {
+        console.error('[API] Failed to decrypt username:', error);
+        return {
+          success: false,
+          error: 'Failed to decrypt data'
+        };
+      }
+    }
+    
+    return response;
   }
 
   async checkNotifications(): Promise<ApiResponse<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>> {
     console.log('[API] Checking for new download notifications');
-    return this.request<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>('/downloads/check-notifications');
+    const response = await this.request<any>('/downloads/check-notifications');
+    
+    if (response.success && response.data) {
+      try {
+        const decryptedData = await decryptApiResponse<{ hasNewDownloads: boolean; notifications: Array<{ downloadId: string; downloadName: string; timestamp: string; acknowledged: boolean }> }>(response.data);
+        return {
+          success: true,
+          data: decryptedData
+        };
+      } catch (error) {
+        console.error('[API] Failed to decrypt notifications:', error);
+        return {
+          success: false,
+          error: 'Failed to decrypt data'
+        };
+      }
+    }
+    
+    return response;
   }
 
   async disconnect(): Promise<ApiResponse<{ message: string }>> {
