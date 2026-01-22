@@ -48,20 +48,30 @@ export async function decryptData(encryptedPackage: any): Promise<any> {
   try {
     // Check if data is encrypted
     if (!encryptedPackage || typeof encryptedPackage !== 'object') {
+      console.log('[Crypto] Data is not an object, returning as-is');
       return encryptedPackage;
     }
 
     if (!encryptedPackage.encrypted) {
       // Data is not encrypted, return as-is (for backward compatibility)
+      console.log('[Crypto] Data is not encrypted, returning as-is');
       return encryptedPackage;
     }
 
+    console.log('[Crypto] Decrypting data...');
+    console.log('[Crypto] Nonce length:', encryptedPackage.nonce?.length);
+    console.log('[Crypto] Data length:', encryptedPackage.data?.length);
+
     // Get the encryption key
     const key = await getEncryptionKey();
+    console.log('[Crypto] Encryption key loaded');
 
     // Decode base64 nonce and ciphertext
     const nonce = Uint8Array.from(atob(encryptedPackage.nonce), c => c.charCodeAt(0));
     const ciphertext = Uint8Array.from(atob(encryptedPackage.data), c => c.charCodeAt(0));
+
+    console.log('[Crypto] Nonce bytes:', nonce.length);
+    console.log('[Crypto] Ciphertext bytes:', ciphertext.length);
 
     // Decrypt using AES-GCM
     const decryptedData = await crypto.subtle.decrypt(
@@ -76,9 +86,14 @@ export async function decryptData(encryptedPackage: any): Promise<any> {
     // Convert decrypted data to string and parse JSON
     const decoder = new TextDecoder();
     const jsonString = decoder.decode(decryptedData);
+    console.log('[Crypto] Decryption successful');
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error('Decryption error:', error);
+    console.error('[Crypto] Decryption error:', error);
+    console.error('[Crypto] Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error)
+    });
     throw new Error('Failed to decrypt data');
   }
 }
