@@ -14,20 +14,61 @@ const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined
 
 const THEME_STORAGE_KEY = 'ascendara-theme'
 
+function getSystemTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [currentTheme, setCurrentTheme] = React.useState<Theme>(themes[0])
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
-    setMounted(true)
     const savedThemeId = localStorage.getItem(THEME_STORAGE_KEY)
     if (savedThemeId) {
       const savedTheme = themes.find(t => t.id === savedThemeId)
       if (savedTheme) {
         setCurrentTheme(savedTheme)
       }
+    } else {
+      const systemTheme = getSystemTheme()
+      const matchingTheme = themes.find(t => t.id === systemTheme)
+      if (matchingTheme) {
+        setCurrentTheme(matchingTheme)
+      }
     }
+    
+    setMounted(true)
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem(THEME_STORAGE_KEY)) {
+        const newSystemTheme = e.matches ? 'dark' : 'light'
+        const matchingTheme = themes.find(t => t.id === newSystemTheme)
+        if (matchingTheme) {
+          setCurrentTheme(matchingTheme)
+        }
+      }
+    }
+    
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
+
+  React.useEffect(() => {
+    if (!mounted) return
+    
+    const isDark = currentTheme.group === 'dark'
+    const htmlElement = document.documentElement
+    
+    if (isDark) {
+      htmlElement.classList.add('dark')
+    } else {
+      htmlElement.classList.remove('dark')
+    }
+    
+    htmlElement.style.colorScheme = isDark ? 'dark' : 'light'
+  }, [currentTheme, mounted])
 
   const setTheme = React.useCallback((themeId: string) => {
     const newTheme = themes.find(t => t.id === themeId)

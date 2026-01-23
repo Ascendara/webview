@@ -25,7 +25,40 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const savedTheme = localStorage.getItem('ascendara-theme');
+                  const themes = {
+                    'dark': 'dark', 'midnight': 'dark', 'cyberpunk': 'dark',
+                    'sunset': 'dark', 'forest': 'dark', 'ocean': 'dark'
+                  };
+                  
+                  let isDark = false;
+                  
+                  if (savedTheme && themes[savedTheme]) {
+                    isDark = themes[savedTheme] === 'dark';
+                  } else {
+                    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  }
+                  
+                  if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.style.colorScheme = 'dark';
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.style.colorScheme = 'light';
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

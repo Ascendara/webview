@@ -47,7 +47,8 @@ class ApiClient {
     this.sessionId = sessionId;
     if (typeof window !== 'undefined') {
       localStorage.setItem('ascendara_session_id', sessionId);
-      console.log('[API] Session ID saved to localStorage')
+      sessionStorage.setItem('ascendara_session_timestamp', Date.now().toString());
+      console.log('[API] Session ID saved to localStorage with timestamp')
     } else {
       console.warn('[API] Window not available, cannot save to localStorage')
     }
@@ -63,6 +64,27 @@ class ApiClient {
       console.warn('[API] Window not available, cannot read from localStorage')
     }
     return this.sessionId;
+  }
+
+  isSessionValid(): boolean {
+    if (typeof window === 'undefined') return false;
+    
+    const sessionId = this.getSessionId();
+    if (!sessionId) return false;
+    
+    const timestamp = sessionStorage.getItem('ascendara_session_timestamp');
+    if (!timestamp) return true;
+    
+    const SESSION_TIMEOUT = 24 * 60 * 60 * 1000;
+    const age = Date.now() - parseInt(timestamp, 10);
+    
+    if (age > SESSION_TIMEOUT) {
+      console.log('[API] Session expired due to age');
+      this.clearSession();
+      return false;
+    }
+    
+    return true;
   }
 
   clearSession() {

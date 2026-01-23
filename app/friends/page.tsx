@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { ThemeButton } from '@/components/theme-button'
 import { ThemeSelectorModal } from '@/components/theme-selector-modal'
 import { BottomNavbar } from '@/components/bottom-navbar'
+import { ConnectionGuard } from '@/components/connection-guard'
 import { apiClient } from '@/lib/api'
+import { connectionState } from '@/lib/connection-state'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
 import { RefreshCw, LogOut, Users, Circle } from 'lucide-react'
@@ -69,7 +71,11 @@ export default function Friends() {
     return <MockFriendsPage />
   }
   
-  return <RealFriendsPage />
+  return (
+    <ConnectionGuard>
+      <RealFriendsPage />
+    </ConnectionGuard>
+  )
 }
 
 function MockFriendsPage() {
@@ -314,22 +320,26 @@ function RealFriendsPage() {
       if (showLoading) setIsRefreshing(true)
 
       try {
-        const response = await apiClient.getFriends()
+        const response = await connectionState.fetchWithDedup(
+          'friends',
+          async () => {
+            const res = await apiClient.getFriends()
+            if (res.success && res.data) {
+              return res.data.friends
+            }
+            return []
+          },
+          showLoading
+        )
 
         if (!isMounted) return
 
-        if (response.success && response.data) {
-          setFriends(response.data.friends)
+        if (response && Array.isArray(response)) {
+          setFriends(response)
           errorCountRef.current = 0
-        } else if (response.error === 'Session expired') {
-          setShowSessionExpiredDialog(true)
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current)
-            pollingIntervalRef.current = null
-          }
         } else {
           errorCountRef.current++
-          console.error('[Friends] Error response:', response.error)
+          console.error('[Friends] Failed to fetch friends')
           
           if (errorCountRef.current >= 3) {
             console.error('[Friends] Too many errors, stopping polling')
@@ -390,9 +400,21 @@ function RealFriendsPage() {
     isFetchingRef.current = true
     
     try {
-      const response = await apiClient.getFriends()
-      if (response.success && response.data) {
-        setFriends(response.data.friends)
+      connectionState.invalidate('friends')
+      const response = await connectionState.fetchWithDedup(
+        'friends',
+        async () => {
+          const res = await apiClient.getFriends()
+          if (res.success && res.data) {
+            return res.data.friends
+          }
+          return []
+        },
+        true
+      )
+      
+      if (response && Array.isArray(response)) {
+        setFriends(response)
         errorCountRef.current = 0
         toast({
           title: 'Refreshed',
@@ -401,7 +423,7 @@ function RealFriendsPage() {
       } else {
         toast({
           title: 'Error',
-          description: response.error || 'Failed to refresh friends list',
+          description: 'Failed to refresh friends list',
           variant: 'destructive',
         })
       }

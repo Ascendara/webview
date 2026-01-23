@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeSelectorModal } from '@/components/theme-selector-modal'
 import { ThemeButton } from '@/components/theme-button'
+import { QRScanner } from '@/components/qr-scanner'
 import { apiClient } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
@@ -22,12 +23,36 @@ export default function Home() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState(false)
   const [showThemeSelector, setShowThemeSelector] = React.useState(false)
+  const [showQRScanner, setShowQRScanner] = React.useState(false)
   const [initialCode, setInitialCode] = React.useState<string>('')
   const [autoConnecting, setAutoConnecting] = React.useState(false)
   const [monitorOffline, setMonitorOffline] = React.useState(false)
   const [checkingMonitor, setCheckingMonitor] = React.useState(true)
+  const [isMobile, setIsMobile] = React.useState(false)
+  const [hasCameraSupport, setHasCameraSupport] = React.useState(false)
   const hasCheckedMonitor = React.useRef(false)
   const isProcessingCode = React.useRef(false)
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent) ||
+                            (window.innerWidth <= 768)
+      setIsMobile(isMobileDevice)
+    }
+    
+    const checkCamera = () => {
+      const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+      console.log('[Connection] Camera support detected:', hasCamera)
+      setHasCameraSupport(hasCamera)
+    }
+    
+    checkMobile()
+    checkCamera()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   React.useEffect(() => {
     if (isDevMode()) {
@@ -299,6 +324,29 @@ export default function Home() {
                 <span>Connecting...</span>
               </div>
             )}
+            {isMobile && hasCameraSupport && (
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className={cn("bg-background px-2 opacity-70", themeColors.text)}>
+                      Or
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowQRScanner(true)}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  <Smartphone className="h-4 w-4 mr-2" />
+                  Scan QR Code
+                </Button>
+              </div>
+            )}
             <div className={cn("text-center text-sm opacity-70", themeColors.text)}>
               <p>Open Ascendara on your desktop and navigate to</p>
               <p className="font-semibold mt-1">Ascend → Settings → Remote Access</p>
@@ -306,6 +354,17 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+      
+      {showQRScanner && (
+        <QRScanner
+          onScan={(code) => {
+            setShowQRScanner(false)
+            setInitialCode(code)
+            handleCodeComplete(code)
+          }}
+          onClose={() => setShowQRScanner(false)}
+        />
+      )}
       
       <ThemeSelectorModal 
         isOpen={showThemeSelector} 
