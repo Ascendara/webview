@@ -266,9 +266,6 @@ export default function Home() {
         
         <Card className={cn("w-full max-w-md shadow-lg border", themeColors.card)}>
           <CardHeader className="text-center space-y-4">
-            <div className={cn("mx-auto w-16 h-16 rounded-full flex items-center justify-center", themeColors.secondary)}>
-              <Code className={cn("h-8 w-8", themeColors.accent)} />
-            </div>
             <div>
               <CardTitle className={cn("text-2xl font-bold", themeColors.text)}>
                 Connect to Ascend
