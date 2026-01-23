@@ -9,7 +9,9 @@ import { ThemeSelectorModal } from '@/components/theme-selector-modal'
 import { ThemeButton } from '@/components/theme-button'
 import { InstallPrompt } from '@/components/install-prompt'
 import { BottomNavbar } from '@/components/bottom-navbar'
+import { ConnectionGuard } from '@/components/connection-guard'
 import { apiClient, Download } from '@/lib/api'
+import { connectionState } from '@/lib/connection-state'
 import { useToast } from '@/hooks/use-toast'
 import { useTheme } from '@/contexts/theme-context'
 import { RefreshCw, LogOut, Download as DownloadIcon, Inbox, AlertTriangle, Users, Circle, Coffee } from 'lucide-react'
@@ -59,7 +61,11 @@ export default function Dashboard() {
     return <MockDashboard />
   }
   
-  return <RealDashboard />
+  return (
+    <ConnectionGuard>
+      <RealDashboard />
+    </ConnectionGuard>
+  )
 }
 
 function RealDashboard() {
@@ -128,9 +134,18 @@ function RealDashboard() {
     
     const fetchUserName = async () => {
       try {
-        const response = await apiClient.getUserName()
-        if (response.success && response.data) {
-          setUserName(response.data.displayName)
+        const response = await connectionState.fetchWithDedup(
+          'userName',
+          async () => {
+            const res = await apiClient.getUserName()
+            if (res.success && res.data) {
+              return res.data.displayName
+            }
+            return ''
+          }
+        )
+        if (response) {
+          setUserName(response)
         }
       } catch (error) {
         console.error('[Dashboard] Error fetching username:', error)
@@ -139,10 +154,17 @@ function RealDashboard() {
     
     const fetchFriends = async () => {
       try {
-        const response = await apiClient.getFriends()
-        if (response.success && response.data) {
-          setFriends(response.data.friends)
-        }
+        const response = await connectionState.fetchWithDedup(
+          'friends',
+          async () => {
+            const res = await apiClient.getFriends()
+            if (res.success && res.data) {
+              return res.data.friends
+            }
+            return []
+          }
+        )
+        setFriends(response)
       } catch (error) {
         console.error('[Dashboard] Error fetching friends:', error)
       }
@@ -160,7 +182,11 @@ function RealDashboard() {
       if (showLoading) setIsRefreshing(true)
 
       try {
-        const response = await apiClient.getDownloads()
+        const response = await connectionState.fetchWithDedup(
+          'downloads',
+          () => apiClient.getDownloads(),
+          showLoading
+        )
 
         if (!isMounted) return
 
@@ -673,7 +699,7 @@ function RealDashboard() {
                   </h1>
                   {lastUpdated && (
                     <p className={cn("text-xs opacity-70", themeColors.text)}>
-                      Updated {lastUpdated.toLocaleTimeString()}
+                      Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}
                 </div>
